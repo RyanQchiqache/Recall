@@ -104,7 +104,7 @@ async function main() {
   // Demo content for richer screens.
   await api('POST', '/api/demo');
   await page.goto(BASE);
-  await page.getByText('Courses in').first().waitFor();
+  await page.getByRole('heading', { name: 'Courses', exact: true }).waitFor();
   await shot(page, '03-dashboard');
 
   const tree = await api('GET', '/api/tree');
@@ -177,7 +177,7 @@ async function main() {
   // Dark mode.
   await api('PATCH', '/api/settings', { theme: 'dark' });
   await page.goto(BASE);
-  await page.getByText('Courses in').first().waitFor();
+  await page.getByRole('heading', { name: 'Courses', exact: true }).waitFor();
   await shot(page, '17-dashboard-dark');
   const s2 = await api('POST', '/api/sessions', {
     mode: 'practice',
@@ -202,7 +202,7 @@ async function main() {
   const mp = await m.newPage();
   watch(mp, 'mobile');
   await mp.goto(BASE);
-  await mp.getByText('Courses in').first().waitFor();
+  await mp.getByRole('heading', { name: 'Courses', exact: true }).waitFor();
   await shot(mp, '20-mobile-dashboard');
   await mp.getByRole('button', { name: 'Open navigation' }).click();
   await shot(mp, '21-mobile-nav');
