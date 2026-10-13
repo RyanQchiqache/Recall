@@ -463,7 +463,7 @@ function CourseScope({
           disabled={inherited}
           onChange={onToggle}
         />
-        <span className="size-2.5 shrink-0 rounded-full bg-[var(--course)]" aria-hidden />
+        <span className="size-2.5 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />
         <label htmlFor={`sc-${c.id}`} className="min-w-0 flex-1 cursor-pointer">
           <span className="block truncate font-medium">{c.title}</span>
           <span className="block text-[13px] text-muted">

@@ -190,7 +190,7 @@ export function SectionPage() {
           Write questions and answers with Markdown, equations, code and images.
         </EmptyState>
       ) : list.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center text-muted">No cards match this filter{q ? ` and “${q}”` : ''}.</p>
+        <p className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center text-muted">No cards match this filter{q ? ` and “${q}”` : ''}.</p>
       ) : (
         <Panel as="div" className="overflow-hidden">
           <div className="flex items-center gap-3 border-b border-border bg-surface-2/60 px-4 py-2 text-xs font-medium text-muted">

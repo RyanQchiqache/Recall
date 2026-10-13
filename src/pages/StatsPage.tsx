@@ -117,7 +117,7 @@ export function StatsPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-soft lg:grid-cols-5 [&>:last-child:nth-child(odd)]:col-span-2 lg:[&>:last-child:nth-child(odd)]:col-span-1">
             <Stat label="Due today" value={d.current.due} hint={`of ${plural(d.current.total, 'active card')}`} />
             <Stat label="New cards" value={d.current.new} hint="never scheduled" />
             <Stat label="Cards reviewed" value={d.totals.uniqueCards} hint={`unique · ${plural(d.totals.attempts, 'attempt')}`} />

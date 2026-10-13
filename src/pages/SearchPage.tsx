@@ -112,7 +112,7 @@ export function SearchPage() {
           <Spinner className="size-4" /> Searching…
         </div>
       ) : results.data.cards.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center text-muted">No cards found.</p>
+        <p className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center text-muted">No cards found.</p>
       ) : (
         <>
           <p className="mb-2 text-sm text-muted" aria-live="polite">

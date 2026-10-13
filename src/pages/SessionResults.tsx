@@ -83,7 +83,7 @@ export function SessionResultsPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-soft lg:grid-cols-4">
         <Stat label="Unique cards" value={`${p.attempted} / ${p.selected}`} hint="attempted / selected" />
         <Stat label="First-attempt recall" value={percent(firstRecalled, firstTotal)} hint={`${firstRecalled} of ${firstTotal} rated Very good or Perfect first time`} />
         <Stat

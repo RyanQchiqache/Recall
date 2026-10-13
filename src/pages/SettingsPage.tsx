@@ -188,7 +188,7 @@ function SettingsForm({ initial }: { initial: AppSettings }) {
           </Card>
 
           {dirty && (
-            <div className="anim-pop sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-pop">
+            <div className="anim-pop sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-pop">
               <span className="text-sm">You have unsaved settings.</span>
               {error && <span className="text-sm text-danger">{error}</span>}
               <div className="flex gap-2">
@@ -284,7 +284,7 @@ function BackupsCard({ settings }: { settings: AppSettings }) {
           Copy full backups to a separate drive — snapshots on the same disk do not protect against disk failure.
         </p>
 
-        <div className="rounded-2xl border border-border p-4">
+        <div className="rounded-xl border border-border p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-semibold">Automatic snapshots</h3>
             {status?.lastErrorAt && (!status.lastSuccessAt || status.lastErrorAt > status.lastSuccessAt) ? (

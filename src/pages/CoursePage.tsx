@@ -134,7 +134,7 @@ export function CoursePage() {
         </Alert>
       )}
 
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-soft sm:grid-cols-4">
         <Stat label="Due today" value={counts.due} />
         <Stat label="New" value={counts.new} />
         <Stat label="Cards" value={counts.total} hint={counts.suspended ? `${counts.suspended} suspended` : undefined} />

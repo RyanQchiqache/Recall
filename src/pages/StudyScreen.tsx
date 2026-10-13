@@ -269,8 +269,8 @@ export function StudyScreen() {
         {s.status === 'paused' ? (
           <PausedPanel onResume={() => resume()} onExit={() => setDialog('exit')} busy={busy} />
         ) : s.waiting ? (
-          <div className="anim-pop my-auto rounded-3xl border border-border bg-surface p-8 text-center shadow-card">
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary-text">
+          <div className="anim-pop my-auto rounded-2xl border border-border bg-surface p-8 text-center shadow-card">
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
               <Repeat2 className="size-6" aria-hidden />
             </div>
             <h1 className="text-xl font-semibold">Only recently missed cards are left</h1>
@@ -291,12 +291,14 @@ export function StudyScreen() {
           </div>
         ) : s.current && snap ? (
           <>
-            <article className="anim-pop relative overflow-hidden rounded-3xl border border-border bg-surface shadow-card" aria-live="polite" key={slot}>
-              <div className="h-1.5 bg-[var(--course)]" aria-hidden />
+            <article className="anim-pop relative overflow-hidden rounded-2xl border border-border bg-surface shadow-card" aria-live="polite" key={slot}>
               <div className="p-6 sm:p-9">
                 <div className="mb-5 flex flex-wrap items-center gap-2 text-[13px] text-muted">
-                  <span className="truncate">
-                    {snap.courseTitle} › {snap.sectionTitle}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />
+                    <span className="min-w-0 truncate">
+                      {snap.courseTitle} › {snap.sectionTitle}
+                    </span>
                   </span>
                   {s.current.isRepeat && (
                     <Badge tone="warning" icon={<Repeat2 className="size-3" aria-hidden />}>
@@ -346,15 +348,15 @@ export function StudyScreen() {
                   <section className="anim-fade mt-8 border-t border-border pt-7" aria-label="Answer">
                     {s.mode === 'test' && s.typedAnswer && (
                       <div className="mb-5 rounded-xl bg-surface-2 px-4 py-3">
-                        <p className="mb-1 text-xs font-semibold tracking-wider text-muted uppercase">Your answer</p>
+                        <p className="mb-1 text-[13px] font-medium text-muted">Your answer</p>
                         <p className="text-[15px] whitespace-pre-wrap">{s.typedAnswer}</p>
                       </div>
                     )}
-                    <p className="mb-3 text-xs font-semibold tracking-wider text-muted uppercase">Answer</p>
+                    <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
                     <Markdown className="text-[17px] leading-relaxed">{snap.back}</Markdown>
                     {snap.explanation && (
-                      <div className="mt-6 rounded-2xl bg-surface-2 px-5 py-4">
-                        <p className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">Explanation</p>
+                      <div className="mt-6 rounded-xl bg-surface-2 px-5 py-4">
+                        <p className="mb-2 text-[13px] font-medium text-muted">Explanation</p>
                         <Markdown className="text-[15px] text-text-2">{snap.explanation}</Markdown>
                       </div>
                     )}
@@ -483,11 +485,13 @@ function RatingButtons({ onRate, disabled, mode }: { onRate: (r: Rating) => void
               aria-keyshortcuts={info.key}
               aria-label={`${info.label} (key ${info.key}): ${info.meaning}`}
               style={{ ['--rc' as string]: RATING_COLOR[r] }}
-              className="group flex min-h-[72px] flex-col items-start justify-center gap-0.5 rounded-2xl border border-border bg-surface py-2.5 pr-3.5 pl-[18px] text-left shadow-[inset_4px_0_0_var(--rc),var(--shadow-sm)] transition-[background-color,border-color,transform] duration-150 hover:border-[var(--rc)] hover:bg-[color-mix(in_srgb,var(--rc)_8%,var(--surface))] active:translate-y-px disabled:opacity-50"
+              className="group flex min-h-[72px] flex-col items-start justify-center gap-1 rounded-xl border border-border bg-surface px-3.5 py-3 text-left shadow-soft transition-[background-color,border-color,box-shadow,transform] duration-150 hover:border-[color-mix(in_srgb,var(--rc)_55%,var(--border))] hover:bg-[color-mix(in_srgb,var(--rc)_6%,var(--surface))] focus-visible:border-[var(--rc)] active:translate-y-px disabled:opacity-50"
             >
               <span className="flex w-full items-center gap-2">
-                <Icon className="size-4 shrink-0 text-[var(--rc)]" aria-hidden />
-                <span className="font-semibold">{info.label}</span>
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-[5px] bg-[color-mix(in_srgb,var(--rc)_14%,transparent)] text-[var(--rc)]" aria-hidden>
+                  <Icon className="size-3.5" strokeWidth={2.5} />
+                </span>
+                <span className="text-sm font-semibold">{info.label}</span>
                 <Kbd className="ml-auto">{info.key}</Kbd>
               </span>
               <span className="line-clamp-2 text-xs leading-snug text-muted">{info.meaning}</span>
@@ -501,8 +505,8 @@ function RatingButtons({ onRate, disabled, mode }: { onRate: (r: Rating) => void
 
 function PausedPanel({ onResume, onExit, busy }: { onResume: () => void; onExit: () => void; busy: boolean }) {
   return (
-    <div className="anim-pop my-auto rounded-3xl border border-border bg-surface p-8 text-center shadow-card">
-      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-surface-2 text-text-2">
+    <div className="anim-pop my-auto rounded-2xl border border-border bg-surface p-8 text-center shadow-card">
+      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-surface-2 text-text-2">
         <Pause className="size-6" aria-hidden />
       </div>
       <h1 className="text-xl font-semibold">Session paused</h1>
@@ -541,8 +545,10 @@ function RatingIntro({ open, onClose }: { open: boolean; onClose: () => void }) 
           const info = RATING_INFO[r];
           const Icon = RATING_ICON[r];
           return (
-            <li key={r} className="flex gap-3 rounded-xl border border-border py-3 pr-3 pl-[18px] shadow-[inset_4px_0_0_var(--rc)]" style={{ ['--rc' as string]: RATING_COLOR[r] }}>
-              <Icon className="mt-0.5 size-5 shrink-0" style={{ color: RATING_COLOR[r] }} aria-hidden />
+            <li key={r} className="flex gap-3 rounded-lg border border-border p-3" style={{ ['--rc' as string]: RATING_COLOR[r] }}>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--rc)_14%,transparent)] text-[var(--rc)]" aria-hidden>
+                <Icon className="size-4" strokeWidth={2.5} />
+              </span>
               <div>
                 <p className="font-semibold">
                   {info.key} · {info.label}

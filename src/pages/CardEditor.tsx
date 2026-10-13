@@ -337,7 +337,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
             )}
           </Panel>
 
-          <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-surface/95 sm:px-3">
+          <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:bottom-3 sm:mx-0 sm:rounded-xl sm:border sm:bg-surface sm:px-3 sm:shadow-pop sm:before:absolute sm:before:inset-x-[-2px] sm:before:bottom-full sm:before:h-4 sm:before:bg-bg sm:before:content-[''] sm:after:absolute sm:after:inset-x-[-2px] sm:after:top-full sm:after:h-3.5 sm:after:bg-bg sm:after:content-['']">
             <Button type="submit" variant="primary" loading={saving} icon={<Save className="size-4" />}>
               {isNew ? 'Save card' : 'Save changes'}
             </Button>
@@ -360,7 +360,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
           <div className="sticky top-4 flex flex-col gap-4">
             <p className="text-sm font-medium text-text-2">Preview — as it appears when studying</p>
             <Panel className="p-6">
-              <p className="mb-3 text-xs font-semibold tracking-wider text-muted uppercase">Question</p>
+              <p className="mb-3 text-[13px] font-medium text-muted">Question</p>
               {form.front.trim() ? <Markdown className="text-[17px]">{form.front}</Markdown> : <p className="text-muted">The question appears here.</p>}
               {form.hint.trim() && (
                 <p className="mt-4 inline-flex items-center gap-1.5 text-sm text-muted">
@@ -369,11 +369,11 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
               )}
             </Panel>
             <Panel className="p-6">
-              <p className="mb-3 text-xs font-semibold tracking-wider text-muted uppercase">Answer</p>
+              <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
               {form.back.trim() ? <Markdown className="text-[17px]">{form.back}</Markdown> : <p className="text-muted">The answer appears here.</p>}
               {form.explanation.trim() && (
                 <div className="mt-5 border-t border-border pt-4">
-                  <p className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">Explanation</p>
+                  <p className="mb-2 text-[13px] font-medium text-muted">Explanation</p>
                   <Markdown className="text-[15px] text-text-2">{form.explanation}</Markdown>
                 </div>
               )}
