@@ -1,10 +1,8 @@
-import { ArrowRight, BookOpen, CalendarClock, FlaskConical, GraduationCap, Layers, Play, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarClock, ChevronDown, Clock3, Flame, FlaskConical, GraduationCap, Inbox, Layers, Play, Plus, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { diffDays } from '../../shared/dates.ts';
 import type { Course, Program, Section, Semester } from '../../shared/types.ts';
-import { DailyBarChart } from '../components/charts.tsx';
-import { CourseIcon } from '../components/CourseIcon.tsx';
 import { useHierarchy } from '../components/HierarchyDialogs.tsx';
 import { PageHeader, SectionTitle } from '../components/layout/AppShell.tsx';
 import { Button, LinkButton } from '../components/ui/Button.tsx';
@@ -13,7 +11,7 @@ import { Field, Input } from '../components/ui/Form.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { api, errorMessage, qs } from '../lib/api.ts';
 import { formatDate, greeting, plural } from '../lib/format.ts';
-import { invalidateContent, queryClient, useDashboard, useTree } from '../lib/queries.ts';
+import { invalidateContent, queryClient, useDashboard, useStats, useTree } from '../lib/queries.ts';
 import { cn, courseVars } from '../lib/util.ts';
 import type { DashboardData } from '../../shared/types.ts';
 
@@ -34,8 +32,8 @@ function DashboardContent({ d }: { d: DashboardData }) {
   const sem = d.currentSemester;
   const studyHref = `/study/new${qs({ semester: sem?.id })}`;
   const semesters = (tree.data ?? []).flatMap((p) => p.semesters.map((s) => ({ id: s.id, label: `${p.title} › ${s.title}` })));
-  const totalActivity = d.activity.reduce((n, a) => n + a.attempts, 0);
   const os = d.openSession;
+  const streak = useStats({}).data?.streak;
 
   return (
     <>
@@ -43,17 +41,18 @@ function DashboardContent({ d }: { d: DashboardData }) {
         docTitle="Dashboard"
         title={`${greeting()}.`}
         subtitle={
-          <span className="flex flex-wrap items-center gap-x-2">
+          <span className="flex flex-col gap-y-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2">
             <span>{formatDate(d.today, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             {sem && (
               <>
-                <span aria-hidden>·</span>
+                <span aria-hidden className="hidden sm:inline">·</span>
                 <label className="sr-only" htmlFor="current-sem">
                   Current semester
                 </label>
+                <span className="relative inline-flex max-w-full items-center self-start sm:self-auto">
                 <select
                   id="current-sem"
-                  className="max-w-full cursor-pointer rounded-md bg-transparent font-medium text-text-2 hover:text-text"
+                  className="max-w-full cursor-pointer appearance-none truncate rounded-md bg-transparent pr-5 pl-0 font-medium text-text-2 [field-sizing:content] hover:text-text"
                   value={sem.id}
                   onChange={async (e) => {
                     await api.patch('/api/settings', { currentSemesterId: e.target.value });
@@ -67,6 +66,8 @@ function DashboardContent({ d }: { d: DashboardData }) {
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="pointer-events-none absolute right-0 size-3.5 text-muted" aria-hidden />
+                </span>
               </>
             )}
           </span>
@@ -111,108 +112,61 @@ function DashboardContent({ d }: { d: DashboardData }) {
         </Alert>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* Study hero */}
-        <Panel className="relative overflow-hidden p-6">
-          <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary-soft opacity-70 blur-2xl" aria-hidden />
-          <div className="relative">
-            <p className="text-sm font-medium text-muted">{sem ? sem.title : 'All courses'}</p>
-            <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
-              <div>
-                <div className="text-5xl font-semibold tracking-tight tabular-nums">{d.counts.due}</div>
-                <div className="mt-1 text-sm text-muted">{d.counts.due === 1 ? 'card due' : 'cards due'} today</div>
-              </div>
-              <div>
-                <div className="text-3xl font-semibold tracking-tight text-text-2 tabular-nums">{d.counts.new}</div>
-                <div className="mt-1 text-sm text-muted">new {d.counts.new === 1 ? 'card' : 'cards'}</div>
-              </div>
-              <div>
-                <div className="text-3xl font-semibold tracking-tight text-text-2 tabular-nums">{d.counts.total}</div>
-                <div className="mt-1 text-sm text-muted">in total</div>
-              </div>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {os ? (
-                <LinkButton to={`/study/${os.id}`} variant="primary" size="lg" icon={<Play className="size-4 fill-current" />}>
-                  Resume session
-                </LinkButton>
-              ) : (
-                <LinkButton to={studyHref} variant="primary" size="lg" icon={<Play className="size-4 fill-current" />}>
-                  {d.counts.due > 0 ? `Review ${plural(d.counts.due, 'due card')}` : 'Start session'}
-                </LinkButton>
-              )}
-              {os && (
-                <LinkButton to={studyHref} size="lg">
-                  New session
-                </LinkButton>
-              )}
-            </div>
-            {d.counts.due === 0 && d.counts.new === 0 && d.counts.total > 0 && !os && (
-              <p className="mt-3 text-sm text-muted">Nothing is due. You can still practise any cards — practice doesn’t change your schedule.</p>
-            )}
-          </div>
-        </Panel>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatTile icon={<Clock3 className="size-[18px]" />} label="Due today" value={d.counts.due}>
+          {d.counts.due === 0
+            ? d.counts.total > 0
+              ? 'All caught up'
+              : 'No cards yet'
+            : `in ${plural(d.courses.filter((c) => c.counts.due > 0).length, 'course')}`}
+        </StatTile>
+        <StatTile icon={<Inbox className="size-[18px]" />} label="New cards" value={d.counts.new}>
+          {d.counts.new > 0 ? 'ready to learn' : 'none waiting'}
+        </StatTile>
+        <StatTile
+          icon={<Flame className="size-[18px]" />}
+          label="Streak"
+          value={streak?.current ?? '–'}
+          unit={streak ? (streak.current === 1 ? 'day' : 'days') : undefined}
+          aside={d.activity.some((a) => a.attempts > 0) ? <ActivityBars activity={d.activity} /> : undefined}
+        >
+          {streak && streak.longest > 0 ? `Best ${plural(streak.longest, 'day')}` : 'Study today to start'}
+        </StatTile>
+      </div>
 
-        {/* Resume / activity */}
-        {os ? (
-          <Panel className="flex flex-col p-6">
-            <p className="text-sm font-medium text-muted">Open session · {os.status === 'paused' ? 'paused' : 'in progress'}</p>
-            <h2 className="mt-1 line-clamp-2 text-lg font-semibold">{os.scopeLabel}</h2>
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={os.progress.selected} aria-valuenow={os.progress.completed + os.progress.unresolved} aria-label="Cards finished">
+      {os && (
+        <Panel className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
+          <div className="min-w-0 flex-1 basis-60">
+            <p className="text-xs font-medium text-muted">Open session · {os.status === 'paused' ? 'paused' : 'in progress'}</p>
+            <p className="mt-0.5 truncate font-medium">{os.scopeLabel}</p>
+          </div>
+          <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={os.progress.selected} aria-valuenow={os.progress.completed + os.progress.unresolved} aria-label="Cards finished">
               <div className="h-full rounded-full bg-primary" style={{ width: `${((os.progress.completed + os.progress.unresolved) / Math.max(1, os.progress.selected)) * 100}%` }} />
             </div>
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-              <div>
-                <dt className="text-muted">Attempted</dt>
-                <dd className="font-semibold tabular-nums">
-                  {os.progress.attempted}/{os.progress.selected}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted">Completed</dt>
-                <dd className="font-semibold tabular-nums">{os.progress.completed}</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Attempts</dt>
-                <dd className="font-semibold tabular-nums">{os.progress.totalAttempts}</dd>
-              </div>
-            </dl>
-            <div className="mt-auto pt-5">
-              <LinkButton to={`/study/${os.id}`} variant="secondary" icon={<ArrowRight className="size-4" />}>
-                Resume
-              </LinkButton>
-            </div>
-          </Panel>
-        ) : (
-          <Panel className="p-6">
-            {totalActivity > 0 ? (
-              <DailyBarChart
-                title="Answer attempts, last 14 days"
-                data={d.activity.map((a) => ({ date: a.date, values: { attempts: a.attempts }, extra: { unique: a.uniqueCards } }))}
-                series={[{ key: 'attempts', label: 'Attempts', color: 'var(--primary)' }]}
-                extraColumns={[{ key: 'unique', label: 'Unique cards' }]}
-                height={130}
-              />
-            ) : (
-              <div className="flex h-full flex-col justify-center">
-                <p className="text-sm font-medium text-text-2">Activity</p>
-                <p className="mt-2 text-muted">No study activity in the last 14 days yet. Your first session will show up here.</p>
-              </div>
-            )}
-          </Panel>
-        )}
-      </div>
+            <span className="shrink-0 text-sm text-muted tabular-nums">
+              {os.progress.completed + os.progress.unresolved}/{os.progress.selected}
+            </span>
+          </div>
+          <LinkButton to={`/study/${os.id}`} variant="primary" icon={<Play className="size-3.5 fill-current" />}>
+            Resume
+          </LinkButton>
+        </Panel>
+      )}
 
       <section className="mt-10" aria-labelledby="courses-h">
         <SectionTitle
           id="courses-h"
           action={
-            <Link to="/organize" className="text-sm font-medium text-primary-text hover:underline">
-              Organize
-            </Link>
+            <span className="flex items-center gap-3 text-sm text-muted">
+              {sem && <span className="hidden truncate sm:inline">{`${sem.title} · ${plural(d.courses.length, 'course')}`}</span>}
+              <Link to="/organize" className="font-medium text-primary-text hover:underline">
+                Organize
+              </Link>
+            </span>
           }
         >
-          {sem ? `Courses in ${sem.title}` : 'Courses'}
+          Courses
         </SectionTitle>
         {d.courses.length === 0 ? (
           <EmptyState
@@ -227,7 +181,7 @@ function DashboardContent({ d }: { d: DashboardData }) {
             Add a course, then weekly sections and cards.
           </EmptyState>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-3 md:grid-cols-2">
             {d.courses.map((c) => (
               <li key={c.id}>
                 <CourseCard course={c} today={d.today} onStudy={() => navigate(`/study/new${qs({ course: c.id })}`)} />
@@ -242,16 +196,16 @@ function DashboardContent({ d }: { d: DashboardData }) {
           <SectionTitle id="recent-h">Recent sections</SectionTitle>
           <Panel as="div" className="divide-y divide-border overflow-hidden">
             {d.recentSections.map((s) => (
-              <Link key={s.id} to={`/sections/${s.id}`} style={courseVars(s.courseColor)} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-2">
-                <span className="h-8 w-1 shrink-0 rounded-full bg-[var(--course)]" aria-hidden />
+              <Link key={s.id} to={`/sections/${s.id}`} style={courseVars(s.courseColor)} className="flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2">
+                <span className="size-2 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{s.title}</span>
-                  <span className="block truncate text-sm text-muted">{s.courseTitle}</span>
+                  <span className="block truncate text-sm font-medium">{s.title}</span>
+                  <span className="block truncate text-[13px] text-muted">{s.courseTitle}</span>
                 </span>
-                <span className="hidden shrink-0 gap-4 text-sm text-muted tabular-nums sm:flex">
-                  <span>{s.counts.due} due</span>
+                <span className="hidden shrink-0 gap-5 text-[13px] text-muted tabular-nums sm:flex">
+                  <span className={cn(s.counts.due > 0 && 'font-medium text-primary-text')}>{s.counts.due} due</span>
                   <span>{s.counts.new} new</span>
-                  <span>{s.counts.total} cards</span>
+                  <span>{plural(s.counts.total, 'card')}</span>
                 </span>
                 <ArrowRight className="size-4 shrink-0 text-muted" aria-hidden />
               </Link>
@@ -259,61 +213,99 @@ function DashboardContent({ d }: { d: DashboardData }) {
           </Panel>
         </section>
       )}
-      {os && totalActivity > 0 && (
-        <section className="mt-10" aria-label="Activity">
-          <Panel className="p-6">
-            <DailyBarChart
-              title="Answer attempts, last 14 days"
-              data={d.activity.map((a) => ({ date: a.date, values: { attempts: a.attempts }, extra: { unique: a.uniqueCards } }))}
-              series={[{ key: 'attempts', label: 'Attempts', color: 'var(--primary)' }]}
-              extraColumns={[{ key: 'unique', label: 'Unique cards' }]}
-              height={110}
-            />
-          </Panel>
-        </section>
-      )}
     </>
+  );
+}
+
+function StatTile({ icon, label, value, unit, aside, children }: { icon: React.ReactNode; label: string; value: React.ReactNode; unit?: string; aside?: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <Panel className="flex min-w-0 items-center gap-4 px-3.5 py-3 sm:px-5 sm:py-4">
+      <span className="hidden size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted sm:flex" aria-hidden>
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium text-muted">{label}</p>
+        <p className="mt-0.5 flex items-baseline gap-1.5">
+          <span className="text-[26px] leading-none font-semibold tracking-[-0.02em] tabular-nums">{value}</span>
+          {unit && <span className="text-sm text-text-2">{unit}</span>}
+        </p>
+        {children && <p className="mt-1 truncate text-xs text-muted">{children}</p>}
+      </div>
+      {aside}
+    </Panel>
+  );
+}
+
+function ActivityBars({ activity }: { activity: DashboardData['activity'] }) {
+  const max = Math.max(1, ...activity.map((a) => a.attempts));
+  const total = activity.reduce((n, a) => n + a.attempts, 0);
+  return (
+    <div className="hidden h-9 shrink-0 items-end gap-[3px] xl:flex" role="img" aria-label={`${plural(total, 'answer')} in the last 14 days`}>
+      {activity.map((a) => (
+        <span
+          key={a.date}
+          title={`${formatDate(a.date, { weekday: 'short', day: 'numeric', month: 'short' })}: ${plural(a.attempts, 'answer')}`}
+          className={cn('w-[5px] rounded-[2px]', a.attempts > 0 ? 'bg-primary' : 'bg-surface-3')}
+          style={{ height: a.attempts > 0 ? `${Math.max(22, (a.attempts / max) * 100)}%` : '14%' }}
+        />
+      ))}
+    </div>
   );
 }
 
 function CourseCard({ course: c, today, onStudy }: { course: DashboardData['courses'][number]; today: string; onStudy: () => void }) {
   const daysToExam = c.examDate ? diffDays(today, c.examDate) : null;
+  const n = c.counts;
+  const active = Math.max(0, n.total - n.suspended);
+  // Reviewed cards that are not due yet: the share that is "on track".
+  const onTrack = Math.max(0, active - n.due - n.new);
+  const pct = active > 0 ? Math.round((onTrack / active) * 100) : 0;
   return (
-    <Panel as="article" style={courseVars(c.color)} className="group relative flex h-full flex-col overflow-hidden p-5 transition-shadow duration-150 hover:shadow-pop">
-      <div className="absolute inset-x-0 top-0 h-1 bg-[var(--course)]" aria-hidden />
+    <Panel as="article" style={courseVars(c.color)} className="group relative flex h-full flex-col p-5 transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-card">
       <div className="flex items-start gap-3">
-        <CourseIcon icon={c.icon} color={c.color} />
+        <span className="mt-[7px] size-2.5 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h3 className="leading-snug font-semibold">
+          <h3 className="truncate text-[15px] leading-snug font-semibold">
             <Link to={`/courses/${c.id}`} className="after:absolute after:inset-0 hover:underline">
               {c.title}
             </Link>
           </h3>
-          <p className="truncate text-sm text-muted">{[c.moduleCode, plural(c.sections.length, 'section')].filter(Boolean).join(' · ')}</p>
+          <p className="truncate text-[13px] text-muted">{[c.moduleCode, plural(c.sections.length, 'section')].filter(Boolean).join(' · ')}</p>
         </div>
+        {daysToExam !== null && daysToExam >= 0 && (
+          <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium', daysToExam <= 14 ? 'bg-warning-soft text-warning' : 'bg-surface-2 text-text-2')}>
+            <CalendarClock className="size-3.5" aria-hidden />
+            Exam {daysToExam === 0 ? 'today' : `in ${plural(daysToExam, 'day')}`}
+          </span>
+        )}
       </div>
-      {daysToExam !== null && daysToExam >= 0 && (
-        <p className={cn('mt-3 inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium', daysToExam <= 14 ? 'bg-warning-soft text-warning' : 'bg-surface-2 text-text-2')}>
-          <CalendarClock className="size-3.5" aria-hidden />
-          Exam {daysToExam === 0 ? 'today' : `in ${plural(daysToExam, 'day')}`}
-        </p>
-      )}
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
-        <div>
-          <dt className="text-muted">Due</dt>
-          <dd className="text-lg font-semibold tabular-nums">{c.counts.due}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">New</dt>
-          <dd className="text-lg font-semibold tabular-nums">{c.counts.new}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">Cards</dt>
-          <dd className="text-lg font-semibold tabular-nums">{c.counts.total}</dd>
-        </div>
+      <dl className="mt-4 flex gap-8">
+        {(
+          [
+            ['due', n.due, n.due > 0 ? 'text-primary-text' : 'text-muted'],
+            ['new', n.new, n.new > 0 ? 'text-text' : 'text-muted'],
+            [n.total === 1 ? 'card' : 'cards', n.total, 'text-text'],
+          ] as const
+        ).map(([label, value, tone]) => (
+          <div key={label} className="flex flex-col-reverse">
+            <dt className="text-[13px] text-muted">{label}</dt>
+            <dd className={cn('text-[22px] leading-tight font-semibold tracking-[-0.01em] tabular-nums', tone)}>{value}</dd>
+          </div>
+        ))}
       </dl>
-      <div className="relative z-10 mt-4 flex gap-2">
-        <Button size="sm" variant={c.counts.due > 0 ? 'primary' : 'secondary'} icon={<Play className="size-3.5 fill-current" />} onClick={onStudy} disabled={c.counts.total === 0}>
+      <div
+        className="mt-4 flex h-1.5 w-full gap-[2px] overflow-hidden rounded-full bg-surface-3"
+        role="img"
+        aria-label={`${pct}% on track, ${n.due} due, ${n.new} new`}
+      >
+        {onTrack > 0 && <span className="h-full rounded-full bg-primary" style={{ width: `${(onTrack / Math.max(1, active)) * 100}%` }} />}
+        {n.due > 0 && <span className="h-full rounded-full bg-[color-mix(in_srgb,var(--primary)_38%,var(--surface-3))]" style={{ width: `${(n.due / Math.max(1, active)) * 100}%` }} />}
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="truncate text-[13px] text-muted">
+          {active === 0 ? 'No cards yet' : onTrack === 0 && n.due === 0 ? `${plural(n.new, 'card')} to learn` : n.due === 0 ? `${pct}% on track · all caught up` : `${pct}% on track`}
+        </p>
+        <Button size="sm" className="relative z-10" variant={n.due > 0 ? 'primary' : 'secondary'} icon={<Play className="size-3 fill-current" />} onClick={onStudy} disabled={n.total === 0}>
           Study
         </Button>
       </div>
