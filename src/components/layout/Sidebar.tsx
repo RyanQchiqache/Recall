@@ -1,16 +1,16 @@
 import { BarChart3, ChevronRight, FolderTree, LayoutDashboard, Moon, Play, Plus, Search, Settings, Sun, Trash2 } from 'lucide-react';
-import { NavLink, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import type { TreeProgram } from '../../../shared/types.ts';
 import { api } from '../../lib/api.ts';
 import { queryClient, useOpenSession, useSettings, useTree } from '../../lib/queries.ts';
 import { cn, courseVars, usePersistentState } from '../../lib/util.ts';
 import { useHierarchy } from '../HierarchyDialogs.tsx';
+import { Kbd } from '../ui/Feedback.tsx';
 import { Logo } from './Logo.tsx';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/study/new', label: 'Study', icon: Play },
-  { to: '/search', label: 'Search', icon: Search },
   { to: '/stats', label: 'Statistics', icon: BarChart3 },
   { to: '/organize', label: 'Organize', icon: FolderTree },
   { to: '/trash', label: 'Trash', icon: Trash2 },
@@ -20,15 +20,29 @@ const NAV = [
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const settings = useSettings();
   const open = useOpenSession();
+  const tree = useTree();
   const h = useHierarchy();
   const navigate = useNavigate();
   const dark = document.documentElement.classList.contains('dark');
+  const totals = (tree.data ?? []).reduce((t, p) => ({ due: t.due + p.counts.due, total: t.total + p.counts.total }), { due: 0, total: 0 });
 
   return (
-    <nav aria-label="Main" className="flex h-full flex-col gap-1 overflow-hidden">
-      <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
-        <Logo />
-        <span className="truncate text-[17px] font-semibold tracking-tight">{settings.data?.appName ?? 'Recall'}</span>
+    <nav aria-label="Main" className="flex h-full flex-col overflow-hidden">
+      <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
+        <Logo size={26} />
+        <span className="truncate text-[16px] font-semibold tracking-[-0.01em]">{settings.data?.appName ?? 'Recall'}</span>
+      </div>
+
+      <div className="px-3 pb-3">
+        <Link
+          to="/search"
+          onClick={onNavigate}
+          className="flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-sm text-muted shadow-soft transition-colors duration-150 hover:border-border-strong hover:text-text-2"
+        >
+          <Search className="size-4 shrink-0" aria-hidden />
+          <span className="flex-1 truncate">Search cards</span>
+          <Kbd>/</Kbd>
+        </Link>
       </div>
 
       {open.data && (
@@ -37,7 +51,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate?.();
             navigate(`/study/${open.data!.id}`);
           }}
-          className="mx-3 mb-2 flex items-center gap-3 rounded-xl bg-primary px-3 py-2.5 text-left text-on-primary shadow-soft transition hover:bg-primary-hover"
+          className="mx-3 mb-3 flex items-center gap-3 rounded-lg bg-primary px-3 py-2 text-left text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.14),var(--shadow-sm)] transition-colors duration-150 hover:bg-primary-hover"
         >
           <Play className="size-4 shrink-0 fill-current" aria-hidden />
           <span className="min-w-0">
@@ -49,7 +63,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </button>
       )}
 
-      <ul className="flex flex-col gap-0.5 px-3">
+      <ul className="flex flex-col gap-px px-3">
         {NAV.map((n) => (
           <li key={n.to}>
             <NavLink
@@ -58,23 +72,28 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  'flex h-9 items-center gap-3 rounded-lg px-2.5 text-[15px] font-medium transition-colors duration-150',
-                  isActive ? 'bg-surface text-text shadow-soft' : 'text-text-2 hover:bg-surface-3/60 hover:text-text',
+                  'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors duration-150',
+                  isActive ? 'bg-primary-soft text-primary-text' : 'text-text-2 hover:bg-surface-2 hover:text-text',
                 )
               }
             >
-              <n.icon className="size-[18px] shrink-0" aria-hidden />
-              {n.label}
+              <n.icon className="size-4 shrink-0 opacity-80" aria-hidden />
+              <span className="flex-1">{n.label}</span>
+              {n.to === '/study/new' && totals.due > 0 && (
+                <span className="text-xs font-medium text-muted tabular-nums" aria-label={`${totals.due} cards due`}>
+                  {totals.due}
+                </span>
+              )}
             </NavLink>
           </li>
         ))}
       </ul>
 
-      <div className="mt-4 flex items-center justify-between px-5 pb-1">
-        <span className="text-xs font-semibold tracking-wider text-muted uppercase">Library</span>
+      <div className="mt-6 flex items-center justify-between px-5 pb-1.5">
+        <span className="text-[13px] font-medium text-muted">Library</span>
         <button
           onClick={() => h.create('course')}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted hover:bg-surface-3/60 hover:text-text"
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-text"
           aria-label="Create course"
         >
           <Plus className="size-3.5" /> Course
@@ -84,10 +103,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <LibraryTree onNavigate={onNavigate} />
       </div>
 
-      <div className="flex items-center justify-between border-t border-border px-4 py-3">
-        <span className="text-xs text-muted">Local · offline</span>
+      <div className="mx-3 flex items-center justify-between border-t border-border px-2 py-3">
+        <span className="flex items-center gap-2 text-xs text-muted">
+          <span className="size-1.5 rounded-full bg-success" aria-hidden />
+          Saved locally{tree.data ? ` · ${totals.total} ${totals.total === 1 ? 'card' : 'cards'}` : ''}
+        </span>
         <button
-          className="inline-flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-3/60 hover:text-text"
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-text"
           aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
           onClick={async () => {
             const theme = dark ? 'light' : 'dark';
@@ -146,13 +168,13 @@ function LibraryTree({ onNavigate }: { onNavigate?: () => void }) {
                                     onClick={onNavigate}
                                     style={courseVars(c.color)}
                                     className={({ isActive: a }) =>
-                                      cn('flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-3/60', a ? 'bg-surface font-medium text-text shadow-soft' : 'text-text-2')
+                                      cn('flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-2', a ? 'bg-primary-soft font-medium text-primary-text' : 'text-text-2')
                                     }
                                   >
-                                    <span className="size-2 shrink-0 rounded-full bg-[var(--course)]" aria-hidden />
+                                    <span className="size-2 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />
                                     <span className="truncate">{c.title}</span>
                                     {c.counts.due > 0 && (
-                                      <span className="ml-auto shrink-0 rounded-full bg-primary-soft px-1.5 text-[11px] font-semibold text-primary-text tabular-nums" aria-label={`${c.counts.due} due`}>
+                                      <span className="ml-auto shrink-0 pl-1 text-xs font-medium text-primary-text tabular-nums" aria-label={`${c.counts.due} due`}>
                                         {c.counts.due}
                                       </span>
                                     )}
@@ -167,7 +189,7 @@ function LibraryTree({ onNavigate }: { onNavigate?: () => void }) {
                                           to={`/sections/${sec.id}`}
                                           onClick={onNavigate}
                                           className={({ isActive: a }) =>
-                                            cn('block truncate rounded-md px-1.5 py-0.5 text-[13px] hover:bg-surface-3/60', a ? 'bg-surface font-medium text-text shadow-soft' : 'text-muted')
+                                            cn('block truncate rounded-md px-1.5 py-0.5 text-[13px] hover:bg-surface-2', a ? 'bg-primary-soft font-medium text-primary-text' : 'text-muted')
                                           }
                                         >
                                           {sec.title}
@@ -195,7 +217,7 @@ function LibraryTree({ onNavigate }: { onNavigate?: () => void }) {
 
 function TreeToggle({ open, onClick, label, className }: { open: boolean; onClick: () => void; label: string; className?: string }) {
   return (
-    <button onClick={onClick} className={cn('flex w-full min-w-0 items-center gap-1 rounded-md py-1 pr-1 text-left hover:bg-surface-3/60', className)} aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}>
+    <button onClick={onClick} className={cn('flex w-full min-w-0 items-center gap-1 rounded-md py-1 pr-1 text-left hover:bg-surface-2', className)} aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}>
       <ChevronRight className={cn('size-3.5 shrink-0 transition-transform duration-150', open && 'rotate-90')} aria-hidden />
       <span className="truncate text-[13px]">{label}</span>
     </button>
