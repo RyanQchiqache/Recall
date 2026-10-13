@@ -122,7 +122,9 @@ describe('course package import', () => {
       data.tables.courses[0].icon = 'skull';
       data.tables.courses[0].exam_date = 'next tuesday';
       data.tables.sections[0].kind = 'party';
-      const [c1, c2] = data.tables.cards;
+      // Export order is not creation order, so pick the cards by their text.
+      const c1 = data.tables.cards.find((c: { front: string }) => c.front === 'Q 1.1');
+      const c2 = data.tables.cards.find((c: { front: string }) => c.front === 'Q 1.2');
       const base = { review_count: 1, lapse_count: 0, first_reviewed_at: '2026-10-01T08:00:00.000Z', last_reviewed_at: '2026-10-01T08:00:00.000Z', last_rating: 3, scheduler_version: 'recall-heuristic-v1', updated_at: '2026-10-01T08:00:00.000Z' };
       data.tables.card_schedules = [
         { ...base, card_id: c1.id, due_date: 'garbage', interval_days: 4 },
