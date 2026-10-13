@@ -819,6 +819,10 @@ export function undoLast(ctx: Ctx, id: string, input: unknown): SessionState {
     if (!ev) throw badRequest('There is no rating to undo in this session');
     const undo = parseJson<UndoPayload>(ev.undo_json, null as unknown as UndoPayload);
     if (!undo) throw new AppError(500, 'corrupt_undo', 'Undo information is missing for this rating');
+    const card = db.prepare('SELECT in_trash FROM card_ctx WHERE id = ?').get(ev.card_id) as { in_trash: number } | undefined;
+    if (!card || card.in_trash) {
+      throw conflict('card_in_trash', 'This card has been moved to the trash since, so this rating can no longer be undone');
+    }
     if (undo.session.is_open === 1 && s.is_open !== 1) {
       const other = db.prepare('SELECT id FROM study_sessions WHERE is_open = 1 AND id != ?').get(id);
       if (other) throw conflict('session_open', 'Another session is open now, so this finished session cannot be reopened');

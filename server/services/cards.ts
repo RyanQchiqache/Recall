@@ -113,6 +113,9 @@ export function updateCard(ctx: Ctx, id: string, input: unknown): Card {
   const data = parse(cardUpdate, input);
   const existing = ctx.db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow | undefined;
   if (!existing || existing.deleted_at) throw notFound('Card');
+  if (itemState(ctx, 'section', existing.section_id).inTrash) {
+    throw badRequest('This card’s section is in the trash. Restore it before editing the card.');
+  }
   if (data.revision !== undefined && data.revision !== existing.revision) {
     throw conflict('revision_conflict', 'This card was changed elsewhere since you opened it.', {
       current: getCard(ctx, id),
@@ -326,15 +329,16 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number } {
         removeOrphanTags(ctx);
         break;
       }
+      // Every change bumps the revision so an editor opened earlier gets a conflict instead of overwriting it.
       case 'suspend':
-        db.prepare(`UPDATE cards SET suspended_at = COALESCE(suspended_at, ?), updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ts, ...ids);
+        db.prepare(`UPDATE cards SET suspended_at = COALESCE(suspended_at, ?), revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ts, ...ids);
         break;
       case 'unsuspend':
-        db.prepare(`UPDATE cards SET suspended_at = NULL, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ...ids);
+        db.prepare(`UPDATE cards SET suspended_at = NULL, revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ...ids);
         break;
       case 'bookmark':
       case 'unbookmark':
-        db.prepare(`UPDATE cards SET bookmarked = ?, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(data.action === 'bookmark' ? 1 : 0, ts, ...ids);
+        db.prepare(`UPDATE cards SET bookmarked = ?, revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(data.action === 'bookmark' ? 1 : 0, ts, ...ids);
         break;
       case 'delete':
         for (const id of ids) {

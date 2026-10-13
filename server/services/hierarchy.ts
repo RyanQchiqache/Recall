@@ -225,9 +225,15 @@ function nextPosition(ctx: Ctx, level: Level, parentId: string | null): number {
   return (row.m ?? -1) + 1;
 }
 
-function assertParentUsable(ctx: Ctx, level: Level, parentId: string) {
+export function assertParentUsable(ctx: Ctx, level: Level, parentId: string) {
   const st = itemState(ctx, level, parentId);
   if (st.inTrash) throw badRequest(`The target ${LEVELS[level].label.toLowerCase()} is in the trash`);
+}
+
+function assertNotInTrash(ctx: Ctx, level: Level, id: string, action: string) {
+  if (itemState(ctx, level, id).inTrash) {
+    throw badRequest(`Restore this ${LEVELS[level].label.toLowerCase()} from the trash before ${action} it`);
+  }
 }
 
 export function createItem(ctx: Ctx, level: Level, input: Record<string, unknown>, opts: { isDemo?: boolean } = {}) {
@@ -330,6 +336,7 @@ export function moveItem(ctx: Ctx, level: 'section' | 'course', id: string, targ
   const def = LEVELS[level];
   const parentLevel = def.parentLevel as Level;
   getRow(ctx, level, id);
+  assertNotInTrash(ctx, level, id, 'moving');
   getRow(ctx, parentLevel, targetParentId);
   assertParentUsable(ctx, parentLevel, targetParentId);
   ctx.db
@@ -481,6 +488,7 @@ export function duplicateCourse(
   input: { semesterId: string; copyProgress?: boolean; title?: string },
 ) {
   const src = getRow<CourseRow>(ctx, 'course', courseId);
+  assertNotInTrash(ctx, 'course', courseId, 'duplicating');
   const semesterId = parse(zId, input.semesterId);
   getRow(ctx, 'semester', semesterId);
   assertParentUsable(ctx, 'semester', semesterId);

@@ -3,13 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { unzipSync, zipSync, type Zippable } from 'fflate';
+import { COURSE_COLORS, COURSE_ICONS, SECTION_KINDS } from '../../shared/catalog.ts';
+import { isLocalDate } from '../../shared/dates.ts';
 import type { BackupStatus, RestorePreview, SnapshotInfo } from '../../shared/types.ts';
 import { APP_VERSION } from '../config.ts';
 import { nowIso, type Ctx } from '../context.ts';
 import { snapshotFileName, type DB } from '../db/connection.ts';
 import { LATEST_SCHEMA_VERSION, MIGRATIONS } from '../db/migrations.ts';
 import { AppError, badRequest, newId, parseJson, placeholders } from '../lib/util.ts';
-import { getRow } from './hierarchy.ts';
+import { assertParentUsable, getRow } from './hierarchy.ts';
 import { detectImageType, MAX_MEDIA_BYTES, MEDIA_FILENAME_RE, referencedMedia } from './media.ts';
 import { getMeta, getSettings, setMeta } from './settings.ts';
 
@@ -493,6 +495,28 @@ function validateCoursePackage(data: BackupData, media: Map<string, Uint8Array>)
   return warnings;
 }
 
+/** Package values are untrusted: anything outside the app's own vocabulary falls back to a default. */
+const oneOf = <T extends string>(allowed: readonly T[], v: unknown, def: T): T => (allowed.includes(v as T) ? (v as T) : def);
+const dateOrNull = (v: unknown) => (isLocalDate(v) ? v : null);
+const SECTION_KIND_VALUES = SECTION_KINDS.map((k) => k.value);
+
+function validSchedule(s: Row): boolean {
+  const int = (v: unknown, min: number) => Number.isInteger(v) && (v as number) >= min;
+  return (
+    isLocalDate(s.due_date) &&
+    int(s.interval_days, 1) &&
+    int(s.review_count, 0) &&
+    int(s.lapse_count, 0) &&
+    int(s.last_rating, 1) &&
+    (s.last_rating as number) <= 4 &&
+    typeof s.first_reviewed_at === 'string' &&
+    !Number.isNaN(Date.parse(s.first_reviewed_at)) &&
+    typeof s.last_reviewed_at === 'string' &&
+    !Number.isNaN(Date.parse(s.last_reviewed_at)) &&
+    typeof s.scheduler_version === 'string'
+  );
+}
+
 export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId: string; includeSchedules: boolean }): { courseId: string } {
   if (!TOKEN_RE.test(token)) throw badRequest('Invalid import token');
   const zipPath = stagingPath(ctx, token, 'zip');
@@ -501,6 +525,7 @@ export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId:
   if (manifest.kind !== 'course') throw badRequest('This is a full backup. Use “Restore full backup” instead.');
   validateCoursePackage(data, media);
   getRow(ctx, 'semester', opts.semesterId);
+  assertParentUsable(ctx, 'semester', opts.semesterId);
   const db = ctx.db;
   const t = ctx.now().getTime();
   const ts = nowIso(ctx);
@@ -513,14 +538,14 @@ export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId:
     db.prepare(
       `INSERT INTO courses (id, semester_id, title, module_code, color, icon, description, exam_date, position, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(courseId, opts.semesterId, String(course.title ?? 'Imported course'), String(course.module_code ?? ''), String(course.color ?? 'indigo'), String(course.icon ?? 'book-open'), String(course.description ?? ''), course.exam_date ?? null, pos, ts, ts);
+    ).run(courseId, opts.semesterId, String(course.title ?? 'Imported course'), String(course.module_code ?? ''), oneOf(COURSE_COLORS, course.color, 'indigo'), oneOf(COURSE_ICONS, course.icon, 'book-open'), String(course.description ?? ''), dateOrNull(course.exam_date), pos, ts, ts);
     for (const s of data.tables.sections ?? []) {
       const id = newId(t);
       sectionMap.set(String(s.id), id);
       db.prepare(
         `INSERT INTO sections (id, course_id, title, kind, week_number, date, notes, position, archived_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(id, courseId, String(s.title ?? 'Section'), String(s.kind ?? 'lecture'), s.week_number ?? null, s.date ?? null, String(s.notes ?? ''), Number(s.position ?? 0), s.archived_at ?? null, ts, ts);
+      ).run(id, courseId, String(s.title ?? 'Section'), oneOf(SECTION_KIND_VALUES, s.kind, 'lecture'), s.week_number ?? null, dateOrNull(s.date), String(s.notes ?? ''), Number(s.position ?? 0), s.archived_at ?? null, ts, ts);
     }
     for (const c of data.tables.cards ?? []) {
       const id = newId(t);
@@ -545,7 +570,7 @@ export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId:
     if (opts.includeSchedules) {
       for (const s of data.tables.card_schedules ?? []) {
         const cardId = cardMap.get(String(s.card_id));
-        if (!cardId) continue;
+        if (!cardId || !validSchedule(s)) continue; // an invalid schedule leaves the card new
         db.prepare(
           `INSERT INTO card_schedules (card_id, due_date, interval_days, review_count, lapse_count, first_reviewed_at, last_reviewed_at, last_rating, scheduler_version, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
