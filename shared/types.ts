@@ -1,0 +1,432 @@
+import type { LocalDate } from './dates.ts';
+import type { QueueProgress } from './queue.ts';
+import type { Rating, StudyMode } from './ratings.ts';
+import type { AppSettings } from './settings.ts';
+
+export type Level = 'program' | 'semester' | 'course' | 'section';
+export type TrashType = Level | 'card';
+
+interface Lifecycle {
+  isDemo: boolean;
+  archivedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Program extends Lifecycle {
+  id: string;
+  title: string;
+  description: string;
+  position: number;
+}
+
+export interface Semester extends Lifecycle {
+  id: string;
+  programId: string;
+  title: string;
+  startDate: LocalDate | null;
+  endDate: LocalDate | null;
+  position: number;
+}
+
+export interface Course extends Lifecycle {
+  id: string;
+  semesterId: string;
+  title: string;
+  moduleCode: string;
+  color: string;
+  icon: string;
+  description: string;
+  examDate: LocalDate | null;
+  position: number;
+}
+
+export type SectionKind = 'lecture' | 'tutorial' | 'revision' | 'reading' | 'other';
+
+export interface Section extends Lifecycle {
+  id: string;
+  courseId: string;
+  title: string;
+  kind: SectionKind;
+  weekNumber: number | null;
+  date: LocalDate | null;
+  notes: string;
+  position: number;
+}
+
+export interface Counts {
+  total: number;
+  due: number;
+  new: number;
+  suspended: number;
+}
+
+export interface TreeSection extends Section {
+  counts: Counts;
+}
+export interface TreeCourse extends Course {
+  counts: Counts;
+  sections: TreeSection[];
+}
+export interface TreeSemester extends Semester {
+  counts: Counts;
+  courses: TreeCourse[];
+}
+export interface TreeProgram extends Program {
+  counts: Counts;
+  semesters: TreeSemester[];
+}
+
+export interface Crumb {
+  id: string;
+  title: string;
+  level: Level;
+}
+
+export type CardStatus = 'new' | 'due' | 'scheduled' | 'suspended';
+
+export interface CardSchedule {
+  dueDate: LocalDate;
+  intervalDays: number;
+  reviewCount: number;
+  lapseCount: number;
+  lastRating: Rating;
+  firstReviewedAt: string;
+  lastReviewedAt: string;
+  schedulerVersion: string;
+}
+
+export interface Card {
+  id: string;
+  sectionId: string;
+  courseId: string;
+  front: string;
+  back: string;
+  explanation: string;
+  hint: string;
+  source: string;
+  bookmarked: boolean;
+  suspendedAt: string | null;
+  position: number;
+  revision: number;
+  isDemo: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  schedule: CardSchedule | null;
+  status: CardStatus;
+  /** Latest recorded (non-undone) rating in any mode, or null if never rated. */
+  lastRating: Rating | null;
+  lastRatingMode: StudyMode | null;
+  sectionTitle: string;
+  courseTitle: string;
+}
+
+export interface CardInput {
+  sectionId: string;
+  front: string;
+  back: string;
+  explanation?: string;
+  hint?: string;
+  source?: string;
+  tags?: string[];
+  bookmarked?: boolean;
+}
+
+export type CardFilter = 'all' | 'new' | 'due' | 'notDue' | 'weak' | 'bookmarked' | 'suspended';
+
+export interface CardListResponse {
+  cards: Card[];
+  total: number;
+}
+
+export interface MediaAsset {
+  id: string;
+  filename: string;
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  originalName: string;
+}
+
+// ---------- Sessions ----------
+
+export type SessionOrdering = 'default' | 'random' | 'weakest';
+export type WeakBasis = 'all' | 'scheduled';
+
+export interface SessionScope {
+  /** Explicit section IDs, course IDs, or a semester. Union of all given. */
+  sectionIds?: string[];
+  courseIds?: string[];
+  semesterId?: string | null;
+  /** Explicit card list (e.g. "review weak cards" after a session). */
+  cardIds?: string[];
+}
+
+export interface SessionFilters {
+  includeNew: boolean;
+  tags: string[];
+  bookmarkedOnly: boolean;
+  /** Practice/test status filter. */
+  status: 'any' | 'new' | 'due' | 'notDue' | 'weak' | 'reviewed';
+  weakBasis: WeakBasis;
+}
+
+export interface SessionRequest {
+  mode: StudyMode;
+  scope: SessionScope;
+  filters: SessionFilters;
+  ordering: SessionOrdering;
+  size: number;
+  maxAttempts: number;
+  seed?: number;
+  title?: string;
+  /** Required to start when fewer cards are available than requested. */
+  acceptSmaller?: boolean;
+}
+
+export interface ScopeSummaryItem {
+  id: string;
+  title: string;
+  level: Level;
+}
+
+export interface SessionPreview {
+  scopeLabel: string;
+  scopeItems: ScopeSummaryItem[];
+  /** Counts of all study-eligible (non-suspended, non-archived) cards in scope. */
+  breakdown: {
+    total: number;
+    due: number;
+    new: number;
+    notYetDue: number;
+    weak: number;
+    neverReviewed: number;
+    suspended: number;
+  };
+  /** Cards matching mode + filters. */
+  available: number;
+  requested: number;
+  willSelect: number;
+  /** Composition of the cards that would be selected. */
+  selection: { due: number; new: number; notYetDue: number };
+}
+
+export type SessionStatus = 'active' | 'paused' | 'completed' | 'ended';
+
+export interface CardSnapshot {
+  front: string;
+  back: string;
+  explanation: string;
+  hint: string;
+  source: string;
+  tags: string[];
+  sectionTitle: string;
+  courseTitle: string;
+  courseColor: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  mode: StudyMode;
+  status: SessionStatus;
+  title: string;
+  scopeLabel: string;
+  startedAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  activeMs: number;
+  progress: QueueProgress;
+}
+
+export interface SessionState extends SessionSummary {
+  revision: number;
+  maxAttempts: number;
+  ordering: SessionOrdering;
+  revealed: boolean;
+  hintShown: boolean;
+  typedAnswer: string;
+  waiting: boolean;
+  relaxed: boolean;
+  current: {
+    cardId: string;
+    attempt: number;
+    isRepeat: boolean;
+    snapshot: CardSnapshot;
+    /** Short excerpt shown when a card was edited after the session began. */
+    editedSinceStart: boolean;
+  } | null;
+  canUndo: boolean;
+  lastRating: { cardId: string; rating: Rating; front: string } | null;
+}
+
+export interface SessionResultCard {
+  cardId: string;
+  front: string;
+  sectionId: string;
+  sectionTitle: string;
+  courseTitle: string;
+  attempts: number;
+  firstRating: Rating | null;
+  finalRating: Rating | null;
+  status: 'pending' | 'completed' | 'unresolved';
+}
+
+export interface SessionResults {
+  session: SessionSummary;
+  firstRatingCounts: Record<Rating, number>;
+  finalRatingCounts: Record<Rating, number>;
+  repeatAttempts: number;
+  notReached: number;
+  cards: SessionResultCard[];
+  bySection: {
+    sectionId: string;
+    sectionTitle: string;
+    courseTitle: string;
+    cards: number;
+    firstRecalled: number;
+    unresolved: number;
+    attempts: number;
+  }[];
+  weakCardIds: string[];
+}
+
+// ---------- Dashboard & stats ----------
+
+export interface DashboardData {
+  settings: AppSettings;
+  today: LocalDate;
+  hasContent: boolean;
+  currentSemester: (Semester & { programTitle: string }) | null;
+  counts: { due: number; new: number; total: number };
+  openSession: SessionSummary | null;
+  courses: (TreeCourse & { programTitle: string; semesterTitle: string })[];
+  recentSections: { id: string; title: string; courseId: string; courseTitle: string; courseColor: string; lastActivityAt: string; counts: Counts }[];
+  activity: { date: LocalDate; attempts: number; uniqueCards: number }[];
+  demoLoaded: boolean;
+}
+
+export interface StatsQuery {
+  from: LocalDate;
+  to: LocalDate;
+  programId?: string;
+  semesterId?: string;
+  courseId?: string;
+}
+
+export interface ModeStats {
+  attempts: number;
+  uniqueCards: number;
+  firstAttempts: number;
+  firstRatingCounts: Record<Rating, number>;
+  /** Sessions cards that reached Very good/Perfect at the end, out of cards attempted. */
+  finishedAfterRepeats: { finished: number; attemptedCards: number };
+}
+
+export interface StatsData {
+  query: StatsQuery;
+  timeZone: string;
+  today: LocalDate;
+  scopeLabel: string;
+  current: { due: number; new: number; total: number; suspended: number; reviewedEver: number };
+  days: {
+    date: LocalDate;
+    scheduled: number;
+    practice: number;
+    test: number;
+    uniqueCards: number;
+    activeMs: number;
+  }[];
+  totals: { attempts: number; uniqueCards: number; activeMs: number; sessions: number; studyDays: number };
+  byMode: Record<StudyMode, ModeStats>;
+  weakSections: {
+    sectionId: string;
+    sectionTitle: string;
+    courseTitle: string;
+    weakFirst: number;
+    firstAttempts: number;
+  }[];
+  heatmap: { date: LocalDate; attempts: number }[];
+  streak: { current: number; longest: number };
+  recentSessions: SessionSummary[];
+}
+
+export interface SystemInfo {
+  appVersion: string;
+  schemaVersion: number;
+  dataDir: string;
+  dbPath: string;
+  mediaDir: string;
+  backupDir: string;
+  host: string;
+  port: number;
+  nodeVersion: string;
+  backupStatus: BackupStatus;
+}
+
+export interface BackupStatus {
+  lastSuccessAt: string | null;
+  lastFile: string | null;
+  lastErrorAt: string | null;
+  lastError: string | null;
+}
+
+export interface SnapshotInfo {
+  name: string;
+  sizeBytes: number;
+  createdAt: string;
+  kind: 'auto' | 'manual' | 'pre-restore' | 'pre-migration' | 'other';
+}
+
+export interface ImpactCounts {
+  semesters: number;
+  courses: number;
+  sections: number;
+  cards: number;
+  reviews: number;
+  openSessionCards: number;
+}
+
+export interface TrashItem {
+  type: TrashType;
+  id: string;
+  title: string;
+  deletedAt: string;
+  context: string;
+  parentInTrash: boolean;
+  impact: ImpactCounts;
+}
+
+export interface RestorePreview {
+  token: string;
+  kind: 'full' | 'course';
+  formatVersion: number;
+  schemaVersion: number;
+  appVersion: string;
+  createdAt: string;
+  counts: Record<string, number>;
+  warnings: string[];
+  includes: string[];
+}
+
+export interface CsvPreviewRow {
+  row: number;
+  front: string;
+  back: string;
+  section: string;
+  tags: string[];
+  source: string;
+  status: 'ok' | 'error' | 'duplicate';
+  errors: string[];
+}
+
+export interface CsvPreview {
+  headers: string[];
+  totalRows: number;
+  rows: CsvPreviewRow[];
+  valid: number;
+  errors: number;
+  duplicates: number;
+  sectionsToCreate: string[];
+}
