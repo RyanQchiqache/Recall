@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+# Local app data must never be committed (default lives outside the repo anyway)
+.recall-data/
+data/
+test-results/
+playwright-report/
+docs/screenshots/*.tmp.png
