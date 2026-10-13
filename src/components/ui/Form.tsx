@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/util.ts';
 
 export const fieldClass =
-  'w-full rounded-xl border border-border bg-surface px-3 text-[15px] text-text shadow-soft placeholder:text-muted/80 transition-colors duration-150 hover:border-border-strong focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/20 disabled:opacity-60 aria-[invalid=true]:border-danger';
+  'w-full rounded-lg border border-border bg-surface px-3 text-sm text-text shadow-soft placeholder:text-muted transition-colors duration-150 hover:border-border-strong focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/15 disabled:opacity-60 aria-[invalid=true]:border-danger';
 
 export function Field({
   label,
@@ -41,7 +41,7 @@ export function Field({
 }
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cn(fieldClass, 'h-10', className)} {...rest} />;
+  return <input ref={ref} className={cn(fieldClass, 'h-9', className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
@@ -51,7 +51,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
     <div className="relative min-w-0">
-      <select ref={ref} className={cn(fieldClass, 'h-10 appearance-none pr-9', className)} {...rest}>
+      <select ref={ref} className={cn(fieldClass, 'h-9 appearance-none pr-9', className)} {...rest}>
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" aria-hidden />

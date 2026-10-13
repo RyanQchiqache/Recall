@@ -45,7 +45,7 @@ export function Badge({ tone = 'neutral', children, className, icon }: { tone?: 
 
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <kbd className={cn('inline-flex min-w-[1.4rem] items-center justify-center rounded-md border border-border-strong border-b-2 bg-surface px-1.5 font-mono text-[11px] leading-5 text-text-2', className)}>
+    <kbd className={cn('inline-flex min-w-[1.4rem] items-center justify-center rounded-[5px] border border-border bg-surface-2 px-1.5 font-mono text-[11px] leading-[18px] text-muted shadow-[0_1px_0_var(--border)]', className)}>
       {children}
     </kbd>
   );
@@ -53,7 +53,7 @@ export function Kbd({ children, className }: { children: ReactNode; className?: 
 
 export function Panel({ children, className, as: As = 'section', ...rest }: { children: ReactNode; className?: string; as?: 'section' | 'div' | 'article' | 'aside' } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <As className={cn('rounded-2xl border border-border bg-surface shadow-card', className)} {...rest}>
+    <As className={cn('rounded-xl border border-border bg-surface shadow-soft', className)} {...rest}>
       {children}
     </As>
   );
@@ -61,8 +61,8 @@ export function Panel({ children, className, as: As = 'section', ...rest }: { ch
 
 export function EmptyState({ icon, title, children, action, className }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong px-6 py-12 text-center', className)}>
-      {icon && <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary-text">{icon}</div>}
+    <div className={cn('flex flex-col items-center justify-center rounded-xl border border-dashed border-border-strong px-6 py-12 text-center', className)}>
+      {icon && <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-surface-2 text-muted">{icon}</div>}
       <h3 className="text-lg font-semibold">{title}</h3>
       {children && <div className="mt-1.5 max-w-md text-muted">{children}</div>}
       {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
@@ -78,13 +78,13 @@ export function Alert({ tone = 'info', title, children, action, className }: { t
     success: { cls: 'bg-success-soft text-success', Icon: CheckCircle2 },
   }[tone];
   return (
-    <div role={tone === 'danger' ? 'alert' : 'status'} className={cn('flex flex-wrap items-start gap-3 rounded-xl px-4 py-3 text-sm', map.cls, className)}>
+    <div role={tone === 'danger' ? 'alert' : 'status'} className={cn('flex flex-wrap items-start gap-3 rounded-lg border border-[color-mix(in_srgb,currentColor_14%,transparent)] px-4 py-3 text-sm', map.cls, className)}>
       <map.Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1 basis-52">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className="text-text-2 [&_strong]:text-text">{children}</div>}
       </div>
-      {action && <div className="flex shrink-0 gap-2">{action}</div>}
+      {action && <div className="-my-1 flex shrink-0 gap-2 max-sm:ml-4 max-sm:basis-full">{action}</div>}
     </div>
   );
 }
@@ -110,9 +110,9 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
 
 export function Stat({ label, value, hint, className }: { label: ReactNode; value: ReactNode; hint?: ReactNode; className?: string }) {
   return (
-    <div className={cn('min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-soft', className)}>
+    <div className={cn('min-w-0 bg-surface px-4 py-3.5', className)}>
       <div className="text-[13px] font-medium text-muted">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[22px] leading-tight font-semibold tracking-[-0.01em] tabular-nums">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted">{hint}</div>}
     </div>
   );

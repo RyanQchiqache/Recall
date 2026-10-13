@@ -6,7 +6,7 @@ import { Button } from './Button.tsx';
 
 const overlay = 'anim-fade fixed inset-0 z-50 bg-[rgb(15_17_25/0.45)] backdrop-blur-[2px]';
 const content =
-  'anim-pop fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border border-border bg-surface shadow-pop focus:outline-none';
+  'anim-pop fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-surface shadow-pop focus:outline-none';
 
 export function Modal({
   open,

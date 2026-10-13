@@ -24,7 +24,7 @@ export function Menu({ items, label = 'More actions', trigger, align = 'end' }: 
         )}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align={align} sideOffset={6} className="anim-pop z-50 min-w-52 rounded-xl border border-border bg-surface p-1.5 shadow-pop">
+        <DropdownMenu.Content align={align} sideOffset={6} className="anim-pop z-50 min-w-52 rounded-lg border border-border bg-surface p-1 shadow-pop">
           {list.map((item, i) => (
             <div key={`${item.label}-${i}`}>
               {item.separatorBefore && i > 0 && <DropdownMenu.Separator className="my-1 h-px bg-border" />}
@@ -32,7 +32,7 @@ export function Menu({ items, label = 'More actions', trigger, align = 'end' }: 
                 disabled={item.disabled}
                 onSelect={item.onSelect}
                 className={cn(
-                  'flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm outline-none select-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-surface-2',
+                  'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm outline-none select-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-surface-2',
                   item.danger ? 'text-danger' : 'text-text',
                 )}
               >

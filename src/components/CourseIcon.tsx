@@ -48,7 +48,7 @@ export const ICONS: Record<string, LucideIcon> = {
 
 export function CourseIcon({ icon, color, size = 'md', className }: { icon: string; color: string; size?: 'sm' | 'md' | 'lg'; className?: string }) {
   const Icon = ICONS[icon] ?? BookOpen;
-  const box = { sm: 'size-7 rounded-lg', md: 'size-10 rounded-xl', lg: 'size-14 rounded-2xl' }[size];
+  const box = { sm: 'size-7 rounded-lg', md: 'size-10 rounded-xl', lg: 'size-14 rounded-xl' }[size];
   const ic = { sm: 'size-4', md: 'size-5', lg: 'size-7' }[size];
   return (
     <span

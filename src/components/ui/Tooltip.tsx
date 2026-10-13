@@ -18,7 +18,7 @@ export function Tip({ content, children, side = 'top' }: { content: ReactNode; c
         <Tooltip.Content
           side={side}
           sideOffset={6}
-          className="anim-fade z-[60] max-w-xs rounded-lg bg-[#1c1e22] px-2.5 py-1.5 text-[13px] leading-snug text-white shadow-pop dark:bg-[#e8ecf3] dark:text-[#111827]"
+          className="anim-fade z-[60] max-w-xs rounded-lg bg-[#111827] px-2.5 py-1.5 text-[13px] leading-snug text-white shadow-pop dark:bg-[#e8ecf3] dark:text-[#111827]"
         >
           {content}
         </Tooltip.Content>
