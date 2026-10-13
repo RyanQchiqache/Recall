@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T16:10:00Z",
+  "title": "Design System: Recall",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Workbench Blue", "canonical": "#2563eb", "darkValue": "#3b82f6", "tonalRamp": ["#172554", "#1e3a8a", "#1d4ed8", "#2563eb", "#4f84ee", "#8fb0f6", "#c7d7fb", "#eef3fe"] },
+      "primary-hover": { "role": "primary", "displayName": "Pressed Blue", "canonical": "#1d4ed8", "darkValue": "#5b95f8" },
+      "primary-soft": { "role": "primary", "displayName": "Wash Blue", "canonical": "#eef3fe", "darkValue": "#18233a" },
+      "primary-text": { "role": "primary", "displayName": "Ink Blue", "canonical": "#1d4ed8", "darkValue": "#8db4ff" },
+      "focus": { "role": "primary", "displayName": "Focus Blue", "canonical": "#3b82f6", "darkValue": "#60a5fa" },
+      "bg": { "role": "neutral", "displayName": "Cool Ground", "canonical": "#f5f6f8", "darkValue": "#0e0f12", "tonalRamp": ["#111827", "#1f2937", "#374151", "#6b7280", "#9ca3af", "#d1d5db", "#e8eaee", "#f5f6f8"] },
+      "surface": { "role": "neutral", "displayName": "Paper White", "canonical": "#ffffff", "darkValue": "#16171b" },
+      "surface-2": { "role": "neutral", "displayName": "Soft Fill", "canonical": "#f3f4f6", "darkValue": "#1c1d22" },
+      "surface-3": { "role": "neutral", "displayName": "Deep Fill", "canonical": "#e8eaee", "darkValue": "#25272d" },
+      "border": { "role": "neutral", "displayName": "Hairline", "canonical": "#e5e7eb", "darkValue": "#26282e" },
+      "border-strong": { "role": "neutral", "displayName": "Firm Hairline", "canonical": "#d1d5db", "darkValue": "#363941" },
+      "text": { "role": "neutral", "displayName": "Ink", "canonical": "#111827", "darkValue": "#ececef" },
+      "text-2": { "role": "neutral", "displayName": "Graphite", "canonical": "#374151", "darkValue": "#c4c6cc" },
+      "muted": { "role": "neutral", "displayName": "Slate", "canonical": "#6b7280", "darkValue": "#8e9199" },
+      "danger": { "role": "semantic", "displayName": "Danger", "canonical": "#dc2626", "darkValue": "#f87171" },
+      "success": { "role": "semantic", "displayName": "Success", "canonical": "#15803d", "darkValue": "#4ade80" },
+      "warning": { "role": "semantic", "displayName": "Warning", "canonical": "#b45309", "darkValue": "#fbbf24" },
+      "rating-bad": { "role": "rating", "displayName": "Bad", "canonical": "#dc2626", "darkValue": "#f87171" },
+      "rating-good": { "role": "rating", "displayName": "Good", "canonical": "#d97706", "darkValue": "#fbbf24" },
+      "rating-verygood": { "role": "rating", "displayName": "Very good", "canonical": "#2563eb", "darkValue": "#60a5fa" },
+      "rating-perfect": { "role": "rating", "displayName": "Perfect", "canonical": "#16a34a", "darkValue": "#4ade80" }
+    },
+    "dataRamps": {
+      "heat-light": ["#eceef2", "#c7d7fb", "#8fb0f6", "#4f84ee", "#1d4ed8"],
+      "heat-dark": ["#1e2026", "#1c2f57", "#24478d", "#3166d0", "#6ea2ff"],
+      "series-light": ["#2563eb", "#ea580c", "#059669"],
+      "series-dark": ["#4f8ff7", "#f07a3c", "#25b886"],
+      "course-swatches": { "indigo": "#6366f1", "blue": "#3b82f6", "sky": "#0ea5e9", "teal": "#14b8a6", "emerald": "#10b981", "lime": "#65a30d", "amber": "#f59e0b", "orange": "#f97316", "rose": "#f43f5e", "fuchsia": "#d946ef", "violet": "#8b5cf6", "slate": "#64748b" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles and the dashboard greeting; 26px under 640px." },
+      "headline": { "displayName": "Headline", "purpose": "Stat values and course-card figures (22-26px), always tabular." },
+      "title": { "displayName": "Title", "purpose": "Section and card titles; dialog titles step to 18px." },
+      "reading": { "displayName": "Reading", "purpose": "Markdown on the study card (19-20px question, 17px answer) and editor preview." },
+      "body": { "displayName": "Body", "purpose": "Default 15px text; controls use 14px, compact controls 13px." },
+      "label": { "displayName": "Label", "purpose": "Muted sentence-case labels, hints and meta lines." },
+      "mono": { "displayName": "Mono", "purpose": "Keycaps (11px), inline code (0.86em), Markdown editor (14px)." }
+    },
+    "shadows": [
+      { "name": "shadow-soft", "value": "0 1px 2px rgb(17 24 39 / 0.04)", "darkValue": "0 1px 2px rgb(0 0 0 / 0.3)", "purpose": "Resting outlined controls, panels, inputs, rating buttons." },
+      { "name": "shadow-card", "value": "0 1px 2px rgb(17 24 39 / 0.04), 0 2px 8px rgb(17 24 39 / 0.04)", "darkValue": "0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.2)", "purpose": "Course-card hover and the study card." },
+      { "name": "shadow-pop", "value": "0 12px 32px -4px rgb(17 24 39 / 0.14), 0 2px 6px rgb(17 24 39 / 0.06)", "darkValue": "0 16px 40px -4px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.3)", "purpose": "Floating layers: dialogs, menus, toasts, tooltips, drawer." },
+      { "name": "primary-bevel", "value": "inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(17 24 39 / 0.04)", "purpose": "Primary buttons and the Resume session button." },
+      { "name": "input-focus-ring", "value": "0 0 0 3px color-mix(in srgb, #2563eb 15%, transparent)", "purpose": "Focused inputs, with border set to primary." },
+      { "name": "focus-outline", "value": "outline: 2px solid var(--focus); outline-offset: 2px", "purpose": "Global :focus-visible treatment." },
+      { "name": "keycap-edge", "value": "0 1px 0 var(--border)", "purpose": "Bottom edge of keyboard keycaps." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "150ms (default ease)", "purpose": "Colour, border and shadow changes on controls; chevron rotation; switch thumb." },
+      { "name": "fade-in", "value": "160ms ease-out", "purpose": "Overlays, scrims and tooltips." },
+      { "name": "pop-in", "value": "180ms cubic-bezier(0.2, 0.8, 0.2, 1); from translateY(4px) scale(0.985)", "purpose": "Dialogs, menus, toasts, study card entry." },
+      { "name": "slide-in", "value": "200ms cubic-bezier(0.2, 0.8, 0.2, 1); from translateX(-100%)", "purpose": "Mobile navigation drawer." },
+      { "name": "press", "value": "translateY(1px) on :active", "purpose": "Buttons and rating tiles." },
+      { "name": "reduced-motion", "value": "all animation and transition durations to 0.001ms", "purpose": "Honours prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px", "purpose": "Rating buttons go to 4 columns; stat tiles gain icons and padding." },
+      { "name": "md", "value": "768px", "purpose": "Course grid goes to 2 columns." },
+      { "name": "lg", "value": "1024px", "purpose": "Fixed 248px sidebar replaces the top bar and drawer." },
+      { "name": "xl", "value": "1280px", "purpose": "Streak tile shows the 14-day activity bars." }
+    ],
+    "layout": { "sidebarWidth": "248px", "contentMaxWidth": "1160px", "mobileTopBar": "56px", "drawerWidth": "min(300px, 85vw)" }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action per view region: Start session, Study when due, Resume.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M6 3l14 9-14 9V3z\"/></svg>Start session</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--primary, #2563eb); color: var(--on-primary, #fff); font: 500 14px/1 'Inter Variable', system-ui, sans-serif; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(17 24 39 / 0.04); cursor: pointer; transition: background-color 150ms, transform 150ms; } .ds-btn-primary:hover { background: var(--primary-hover, #1d4ed8); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--focus, #3b82f6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Default button: outlined white surface for every non-primary action.",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>Create course</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: var(--surface, #fff); color: var(--text, #111827); font: 500 14px/1 'Inter Variable', system-ui, sans-serif; box-shadow: 0 1px 2px rgb(17 24 39 / 0.04); cursor: pointer; transition: background-color 150ms, border-color 150ms, transform 150ms; } .ds-btn-secondary:hover { background: var(--surface-2, #f3f4f6); border-color: var(--border-strong, #d1d5db); } .ds-btn-secondary:active { transform: translateY(1px); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--focus, #3b82f6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis action and icon buttons.",
+      "html": "<button class=\"ds-btn-ghost\">Remove demo</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2, #374151); font: 500 14px/1 'Inter Variable', system-ui, sans-serif; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-ghost:hover { background: var(--surface-2, #f3f4f6); color: var(--text, #111827); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--focus, #3b82f6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "36px hairline field with a primary border and soft ring on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Course title\" />",
+      "css": ".ds-input { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: var(--surface, #fff); color: var(--text, #111827); font: 400 14px 'Inter Variable', system-ui, sans-serif; box-shadow: 0 1px 2px rgb(17 24 39 / 0.04); caret-color: var(--primary, #2563eb); transition: border-color 150ms; } .ds-input::placeholder { color: var(--muted, #6b7280); } .ds-input:hover { border-color: var(--border-strong, #d1d5db); } .ds-input:focus { outline: none; border-color: var(--primary, #2563eb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2563eb) 15%, transparent); }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "32px nav rows; active row in wash blue with ink-blue label; Study shows the due count.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/></svg><span>Dashboard</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M6 3l14 9-14 9V3z\"/></svg><span>Study</span><span class=\"ds-count\">12</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M3 3v18h18M8 17V9M13 17V5M18 17v-6\"/></svg><span>Statistics</span></a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 1px; width: 224px; padding: 12px; background: var(--surface, #fff); } .ds-nav-item { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 6px; color: var(--text-2, #374151); font: 500 14px 'Inter Variable', system-ui, sans-serif; text-decoration: none; transition: background-color 150ms, color 150ms; } .ds-nav-item svg { opacity: 0.8; flex-shrink: 0; } .ds-nav-item span:first-of-type { flex: 1; } .ds-nav-item:hover { background: var(--surface-2, #f3f4f6); color: var(--text, #111827); } .ds-nav-item.ds-active { background: var(--primary-soft, #eef3fe); color: var(--primary-text, #1d4ed8); } .ds-nav-item:focus-visible { outline: 2px solid var(--focus, #3b82f6); outline-offset: 2px; } .ds-count { font-size: 12px; color: var(--muted, #6b7280); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Pill status chip in neutral or a soft tone; rating badges carry their icon.",
+      "html": "<span class=\"ds-badge\">Not rated</span> <span class=\"ds-badge ds-perfect\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" aria-hidden=\"true\"><path d=\"M18 6L7 17l-5-5M22 10l-7.5 7.5L13 16\"/></svg>Perfect</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border, #e5e7eb); border-radius: 9999px; background: var(--surface-2, #f3f4f6); color: var(--text-2, #374151); font: 500 12px 'Inter Variable', system-ui, sans-serif; white-space: nowrap; } .ds-badge.ds-perfect { border-color: transparent; background: color-mix(in srgb, var(--rating-perfect, #16a34a) 13%, transparent); color: var(--rating-perfect, #16a34a); }"
+    },
+    {
+      "name": "Course Card",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Dashboard course card: swatch, title, tabular figures, on-track bar, Study action.",
+      "html": "<article class=\"ds-course\"><div class=\"ds-course-head\"><span class=\"ds-swatch\"></span><div><h3>Computer Vision III</h3><p>CV3 · 4 sections</p></div></div><dl class=\"ds-figs\"><div><dd class=\"ds-due\">8</dd><dt>due</dt></div><div><dd>3</dd><dt>new</dt></div><div><dd>42</dd><dt>cards</dt></div></dl><div class=\"ds-track\"><span style=\"width:62%\"></span><span class=\"ds-track-due\" style=\"width:19%\"></span></div><p class=\"ds-meta\">62% on track</p></article>",
+      "css": ".ds-course { position: relative; display: flex; flex-direction: column; width: 360px; padding: 20px; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; background: var(--surface, #fff); box-shadow: 0 1px 2px rgb(17 24 39 / 0.04); font-family: 'Inter Variable', system-ui, sans-serif; color: var(--text, #111827); transition: border-color 150ms, box-shadow 150ms; } .ds-course:hover { border-color: var(--border-strong, #d1d5db); box-shadow: 0 1px 2px rgb(17 24 39 / 0.04), 0 2px 8px rgb(17 24 39 / 0.04); } .ds-course-head { display: flex; gap: 12px; align-items: flex-start; } .ds-swatch { width: 10px; height: 10px; margin-top: 7px; border-radius: 3px; background: #14b8a6; flex-shrink: 0; } .ds-course h3 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.375; } .ds-course-head p, .ds-meta { margin: 0; font-size: 13px; color: var(--muted, #6b7280); } .ds-figs { display: flex; gap: 32px; margin: 16px 0 0; } .ds-figs div { display: flex; flex-direction: column-reverse; } .ds-figs dt { font-size: 13px; color: var(--muted, #6b7280); } .ds-figs dd { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; font-variant-numeric: tabular-nums; } .ds-figs .ds-due { color: var(--primary-text, #1d4ed8); } .ds-track { display: flex; gap: 2px; height: 6px; margin: 16px 0; overflow: hidden; border-radius: 9999px; background: var(--surface-3, #e8eaee); } .ds-track span { height: 100%; border-radius: 9999px; background: var(--primary, #2563eb); } .ds-track .ds-track-due { background: color-mix(in srgb, var(--primary, #2563eb) 38%, var(--surface-3, #e8eaee)); }"
+    },
+    {
+      "name": "Rating Button",
+      "kind": "custom",
+      "refersTo": "rating-button",
+      "description": "Signature study control: outlined tile tinted by its rating colour on hover and focus only.",
+      "html": "<button class=\"ds-rate\" style=\"--rc:#16a34a\"><span class=\"ds-rate-row\"><span class=\"ds-rate-icon\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" aria-hidden=\"true\"><path d=\"M18 6L7 17l-5-5M22 10l-7.5 7.5L13 16\"/></svg></span><span class=\"ds-rate-name\">Perfect</span><kbd class=\"ds-kbd\">4</kbd></span><span class=\"ds-rate-meaning\">I answered immediately and confidently</span></button>",
+      "css": ".ds-rate { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; width: 180px; min-height: 72px; padding: 12px 14px; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; background: var(--surface, #fff); color: var(--text, #111827); text-align: left; font-family: 'Inter Variable', system-ui, sans-serif; box-shadow: 0 1px 2px rgb(17 24 39 / 0.04); cursor: pointer; transition: background-color 150ms, border-color 150ms, transform 150ms; } .ds-rate:hover { border-color: color-mix(in srgb, var(--rc) 55%, var(--border, #e5e7eb)); background: color-mix(in srgb, var(--rc) 6%, var(--surface, #fff)); } .ds-rate:focus-visible { border-color: var(--rc); outline: 2px solid var(--focus, #3b82f6); outline-offset: 2px; } .ds-rate:active { transform: translateY(1px); } .ds-rate-row { display: flex; width: 100%; align-items: center; gap: 8px; } .ds-rate-icon { display: flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 5px; background: color-mix(in srgb, var(--rc) 14%, transparent); color: var(--rc); } .ds-rate-name { font-size: 14px; font-weight: 600; } .ds-rate-meaning { font-size: 12px; line-height: 1.375; color: var(--muted, #6b7280); } .ds-kbd { margin-left: auto; display: inline-flex; min-width: 1.4rem; justify-content: center; padding: 0 6px; border: 1px solid var(--border, #e5e7eb); border-radius: 5px; background: var(--surface-2, #f3f4f6); color: var(--muted, #6b7280); font: 400 11px/18px 'JetBrains Mono Variable', ui-monospace, monospace; box-shadow: 0 1px 0 var(--border, #e5e7eb); }"
+    },
+    {
+      "name": "Stat Tile",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Dashboard stat: hairline icon square, muted label, tabular headline value, hint.",
+      "html": "<div class=\"ds-stat\"><span class=\"ds-stat-icon\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg></span><div><p class=\"ds-stat-label\">Due today</p><p class=\"ds-stat-value\">24</p><p class=\"ds-stat-hint\">across 3 courses</p></div></div>",
+      "css": ".ds-stat { display: flex; align-items: center; gap: 16px; width: 300px; padding: 16px 20px; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; background: var(--surface, #fff); box-shadow: 0 1px 2px rgb(17 24 39 / 0.04); font-family: 'Inter Variable', system-ui, sans-serif; } .ds-stat-icon { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; color: var(--muted, #6b7280); } .ds-stat p { margin: 0; } .ds-stat-label { font-size: 13px; font-weight: 500; color: var(--muted, #6b7280); } .ds-stat-value { margin-top: 2px !important; font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text, #111827); } .ds-stat-hint { margin-top: 4px !important; font-size: 12px; color: var(--muted, #6b7280); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Workbench",
+    "overview": "Recall is the category standard for a study app, played straight and executed at Linear-grade precision. It is a neutral workspace: a white sidebar on a cool grey ground, near-black ink, one blue accent, 1px hairlines and near-flat surfaces. Nothing in the chrome performs. The loudest thing on any screen is either the number that tells the student what to do next (cards due, streak) or, on the study screen, the card itself with its math and code.\n\nDensity is desk density: 15px body, 13px labels, 32–36px controls, tabular figures everywhere a number can move. Hierarchy comes from weight (500/600), size steps and the ink ramp (text, text-2, muted), not from colour or decoration. The keyboard is a first-class surface: shortcut keycaps sit inline next to the actions they trigger.\n\nTwo families of colour sit outside the neutral-plus-blue core and are fenced in. Rating colours (red, amber, blue, green) appear only where a rating is shown. Course colours are user data: a small square swatch or a tinted icon tile that identifies a course, never a fill for chrome. Light and dark themes are both complete token sets, not inversions.",
+    "keyCharacteristics": [
+      "Neutral grey ground, white surfaces, one blue accent.",
+      "1px hairline borders do the structural work; shadows are barely there at rest.",
+      "Inter with tabular numerals; weights 400/500/600 only.",
+      "8–12px radii on controls and panels, 16px on the study card alone.",
+      "Keyboard hints rendered as mono keycaps beside their actions.",
+      "Motivation from real data (counts, streak bars, on-track bars), never from badges or celebration."
+    ],
+    "rules": [
+      { "name": "The One Blue Rule", "body": "Blue is reserved for primary actions, selection, due counts and progress. If it is not one of those, it is grey.", "section": "colors" },
+      { "name": "The Rating Fence Rule", "body": "The four rating colours appear only where a rating is shown or rated. Never borrow amber for a warning or green for success from the rating set; use the semantic tokens.", "section": "colors" },
+      { "name": "The Course Swatch Rule", "body": "Course colours identify a course through an 8–10px square swatch (3px radius) or a 15% tinted icon tile. They never fill buttons, headers or backgrounds.", "section": "colors" },
+      { "name": "The Tabular Rule", "body": "Every count, percentage and duration uses tabular figures so values do not jitter as they change.", "section": "typography" },
+      { "name": "The Three Weights Rule", "body": "400, 500 and 600 only (650 inside rendered Markdown headings and strong). No bold 700 in the chrome.", "section": "typography" },
+      { "name": "The Hairline First Rule", "body": "Structure is drawn with 1px borders, never with shadow. A shadow that is visible at rest on a non-floating element is too strong.", "section": "elevation" },
+      { "name": "The Lift-On-Hover Rule", "body": "Interactive cards step from soft to card shadow and from border to border-strong on hover; nothing translates upward. Pressed buttons move down 1px.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep one primary button per view region; everything else is secondary or ghost.",
+      "Do use primary-text, not primary, whenever blue is text.",
+      "Do draw structure with 1px hairlines (border) and reserve shadow-lg for floating layers.",
+      "Do set every changing number in tabular figures.",
+      "Do show keyboard shortcuts as mono keycaps beside their actions.",
+      "Do define every new colour in both the `:root` and `.dark` token sets.",
+      "Do show progress only from real data: counts, streak, activity bars, on-track bars."
+    ],
+    "donts": [
+      "Don't use rating colours outside rating contexts, or semantic colours for ratings.",
+      "Don't fill chrome with course colours; a course is identified by its swatch or tinted icon tile.",
+      "Don't add mascots, confetti, XP bars, cartoon badges or celebratory gamification.",
+      "Don't return to the indigo-on-cream soft-card look this system replaced.",
+      "Don't add uppercase tracked labels or eyebrows above headings; labels are 13px sentence case.",
+      "Don't use weights above 600 in the interface chrome.",
+      "Don't hardcode hex values in components; reference the tokens."
+    ]
+  }
+}
