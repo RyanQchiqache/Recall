@@ -1,0 +1,127 @@
+{
+  "title": "Choose Recall's visual world",
+  "question": "The roll assigned the Leitner box. Keep it, take an alternate, or re-roll. Every option keeps all features and flows; only the look changes.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Leitner Box",
+      "kicker": "THE ROLL",
+      "lineage": "the Karteikasten every German student filled before exams",
+      "thesis": "Your courses as real card boxes: watch cards move from 'due' to 'filed' as you learn.",
+      "palette": ["#1d3557", "#eef1f5", "#ffffff", "#d8443c", "#f4c430", "#5bb974"],
+      "materials": ["white index-card stock with a red header rule", "box-blue rail", "coloured divider tabs"],
+      "viewport": "Box-blue side rail; the dashboard leads with today's box: a huge due count and every course drawn as a box cross-section (Due · New · Filed stacks) on one baseline, Start session on the front.",
+      "risk": "Can tip into skeuomorphic costume if the box drawing grows beyond the data it shows.",
+      "raised": [
+        { "from": "challenger-star-atlas", "raise": "One fixed ramp: stack thickness uses the same card-per-pixel scale everywhere, so courses compare honestly." },
+        { "from": "challenger-botanical-folio", "raise": "One shared baseline: all course boxes stand on the same shelf line at the same scale." },
+        { "from": "challenger-ticket-wallet", "raise": "Nothing disappears, it is filed: results stamp each card with its rating instead of just listing counts." },
+        { "from": "challenger-type-specimen", "raise": "Hierarchy by scale contrast: the due count is set very large, labels stay small." },
+        { "from": "challenger-character-goods", "raise": "Suspended and archived cards print desaturated in place rather than vanishing." }
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html"
+    },
+    {
+      "id": "model-pick",
+      "label": "Highlighted Lecture Script",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "the printed Skript, marked up in four highlighter colours the night before the exam",
+      "thesis": "The four ratings are four highlighter inks; progress is literally your material getting marked up.",
+      "palette": ["#ffffff", "#16181c", "#ffe94d", "#ff9ccf", "#8ef0a8", "#8fd4ff"],
+      "materials": ["bright offset-paper white", "black print type", "fluorescent highlighter strokes"],
+      "viewport": "Clean white workspace; the dashboard's courses are rows whose progress bars are hand-swept highlighter strokes in the rating inks, with the due count highlighted in yellow.",
+      "risk": "Fluorescent inks fight text contrast and can read as a gimmick if strokes go beyond progress and ratings.",
+      "html": ".impeccable/mocks/decision/model-pick.html"
+    },
+    {
+      "id": "challenger-dev-console",
+      "label": "Graphite Console",
+      "verdict": "competitive",
+      "lineage": "dark-first developer consoles",
+      "thesis": "A graphite study desk where syntax colours mark state and panels persist.",
+      "palette": ["#15171c", "#20232a", "#2c3039", "#e6e8ec", "#7ee2a0", "#c4a5ff", "#fbbf6b"],
+      "materials": ["graphite panels", "hairline seams", "monospaced figures"],
+      "viewport": "Persistent panels: library on the left, today's queue centre, stats right; syntax-coloured state chips.",
+      "case": "Holds product clarity for an informatics student, but loses on identification: it reads as a dev tool, not a study desk.",
+      "risk": "Drifts toward the hacker look and feels like work software in daylight desk sessions.",
+      "html": ".impeccable/mocks/decision/challenger-dev-console.html"
+    },
+    {
+      "id": "challenger-star-atlas",
+      "label": "Star Atlas",
+      "verdict": "declined",
+      "lineage": "celestial star charts",
+      "thesis": "Mastered cards as brighter stars on a night chart.",
+      "palette": ["#0d1b2a", "#f1f1ea", "#e05a47"],
+      "materials": ["navy chart ground", "magnitude dots"],
+      "viewport": "A night-sky chart per course.",
+      "case": "Fuses poorly: obscures the study task and reads dark.",
+      "risk": "Pretty but slow to read.",
+      "kept": "A fixed magnitude ramp for mastery."
+    },
+    {
+      "id": "challenger-character-goods",
+      "label": "Character Goods Catalog",
+      "verdict": "declined",
+      "lineage": "mascot goods catalogs",
+      "thesis": "Courses as a roster of mascots.",
+      "palette": ["#ffd6e0", "#c9f2e6", "#ffffff"],
+      "materials": ["pastel grounds", "rounded mascots"],
+      "viewport": "A pastel mascot grid.",
+      "case": "Fails a product commitment: no mascots or childish gamification.",
+      "risk": "Childish.",
+      "kept": "Retired items print in grayscale."
+    },
+    {
+      "id": "challenger-botanical-folio",
+      "label": "Botanical Folio",
+      "verdict": "declined",
+      "lineage": "seasonal botanical plates",
+      "thesis": "Cards grow from seed to fruit.",
+      "palette": ["#f3ecdc", "#2f5d3a", "#b3261e"],
+      "materials": ["cream plates", "sepia rules"],
+      "viewport": "Growth-stage plates per course.",
+      "case": "Fuses poorly: growth metaphor is decorative and lands in the cream-paper rut.",
+      "risk": "Soft and slow.",
+      "kept": "Fixed scale on one shared baseline."
+    },
+    {
+      "id": "challenger-ticket-wallet",
+      "label": "Jet-age Ticket Wallet",
+      "verdict": "declined",
+      "lineage": "airline coupon books",
+      "thesis": "A session as a coupon book that tears off card by card.",
+      "palette": ["#14213d", "#d62828", "#ffffff", "#5e3a8c"],
+      "materials": ["coupon stock", "carbon numerals"],
+      "viewport": "A ticket wallet for today's session.",
+      "case": "Fuses poorly: travel is foreign to studying.",
+      "risk": "Novelty.",
+      "kept": "States stamp themselves; nothing disappears."
+    },
+    {
+      "id": "challenger-type-specimen",
+      "label": "Type Specimen",
+      "verdict": "declined",
+      "lineage": "variable-font specimens",
+      "thesis": "Hierarchy by scale alone.",
+      "palette": ["#fafafa", "#111111", "#ff4f00"],
+      "materials": ["paper white", "giant glyphs"],
+      "viewport": "A giant due number.",
+      "case": "Fuses poorly: no link to studying.",
+      "risk": "Empty spectacle.",
+      "kept": "Scale contrast carries hierarchy."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A modern flashcard app (Anki/Quizlet class), executed impeccably.",
+    "palette": ["#ffffff", "#f5f6f8", "#111827", "#2563eb"],
+    "materials": ["clean neutral grid", "soft cards", "one blue accent"],
+    "viewport": "Sidebar, greeting, stat tiles and a course card grid at full craft.",
+    "risk": "Indistinguishable from other study apps by design.",
+    "html": ".impeccable/mocks/decision/canon.html"
+  },
+  "steer": true
+}

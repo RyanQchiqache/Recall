@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Recall — Leitner Box</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#1d3557;--blue2:#28466f;--ground:#eef1f5;--card:#fff;--red:#d8443c;--yel:#f4c430;--grn:#5bb974;--fil:#a9b6c8;--ink:#16202e;--mut:#64748b;--line:#dbe1e8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;font-feature-settings:"tnum" 1,"cv11" 1;background:var(--ground);color:var(--ink);display:flex}
+.rail{width:248px;height:900px;background:var(--blue);color:#dbe4f0;padding:28px 16px;display:flex;flex-direction:column}
+.logo{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;color:#fff;padding:0 10px 28px;letter-spacing:-.01em}
+.mark{width:22px;height:18px;border:2px solid #fff;border-top:0;position:relative}
+.mark:before{content:"";position:absolute;left:3px;bottom:2px;width:2px;height:18px;background:var(--yel)}
+.mark:after{content:"";position:absolute;left:9px;bottom:2px;width:2px;height:14px;background:var(--grn)}
+.nav a{display:flex;align-items:center;gap:12px;height:38px;padding:0 10px;border-radius:6px;font-size:14px;font-weight:500;color:#c4d0e0;text-decoration:none}
+.nav a i{width:16px;height:16px;border:1.5px solid currentColor;border-radius:4px;opacity:.7}
+.nav a.on{background:var(--blue2);color:#fff;box-shadow:inset 3px 0 0 var(--yel)}
+.lib{margin-top:28px;border-top:1px solid #2f4b72;padding-top:20px;font-size:13px}
+.lib h6{font-size:11px;letter-spacing:.12em;color:#8ea3bf;font-weight:600;padding:0 10px 10px}
+.lib div{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;color:#c4d0e0;border-radius:6px}
+.lib .l1{padding-left:22px}.lib .l2{padding-left:36px}
+.lib span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lib b{width:8px;height:8px;border-radius:2px;flex:none}
+.lib em{margin-left:auto;font-style:normal;color:#8ea3bf;font-size:12px}
+.foot{margin-top:auto;font-size:12px;color:#8ea3bf;padding:0 10px;display:flex;gap:8px;align-items:center}
+.foot:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--grn)}
+main{flex:1;padding:36px 48px 0}
+.top{display:flex;align-items:flex-end;justify-content:space-between}
+h1{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.date{font-size:15px;color:var(--mut);margin-top:6px}
+.ctl{display:flex;gap:12px}
+.sel{height:40px;padding:0 38px 0 14px;border:1px solid var(--line);background:#fff;border-radius:6px;font-size:14px;font-weight:500;display:flex;align-items:center;position:relative}
+.sel:after{content:"";position:absolute;right:15px;top:14px;width:7px;height:7px;border-right:1.5px solid var(--mut);border-bottom:1.5px solid var(--mut);transform:rotate(45deg)}
+.btn{height:40px;padding:0 20px;background:var(--blue);color:#fff;border-radius:6px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px}
+.btn kbd{font:500 11px Inter;color:#9fb3cf;border:1px solid #3a5780;border-radius:4px;padding:1px 5px}
+.hero{margin-top:28px;background:var(--card);border-top:3px solid var(--red);border-radius:4px 4px 8px 8px;box-shadow:0 1px 2px rgba(22,32,46,.06);padding:22px 36px 26px}
+.hh{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut)}
+.hh strong{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);font-weight:600}
+.leg{display:flex;gap:18px;align-items:center}.leg span{display:flex;gap:6px;align-items:center}
+.leg b{width:14px;height:8px;border-radius:2px 2px 0 0}
+.stage{display:grid;grid-template-columns:236px 1fr;grid-template-rows:166px 84px;column-gap:40px;margin-top:10px}
+.big{font-size:128px;font-weight:700;letter-spacing:-.05em;line-height:.78;align-self:end;color:var(--blue)}
+.bl{padding-top:16px}.bl p{font-size:15px;font-weight:500}.bl small{display:block;font-size:13px;color:var(--mut);margin:3px 0 12px}
+.bl .btn{height:34px;font-size:13px;padding:0 14px;display:inline-flex}
+.row{display:flex;gap:24px;align-items:flex-end;border-bottom:2px solid var(--blue);padding-left:4px}
+.box{height:80px;border:2px solid var(--blue);border-top:0;border-bottom:0;display:flex;align-items:flex-end;padding:0 0 0 0}
+.c{position:relative;height:112px;padding:0 4px 0 8px;display:flex}
+.c:before{content:"";position:absolute;left:2px;bottom:0;width:2px;height:var(--h);background:var(--t)}
+.c:after{content:"";position:absolute;left:2px;bottom:var(--h);width:20px;height:12px;background:var(--t);border-radius:3px 3px 0 0}
+.s{height:112px;background:repeating-linear-gradient(90deg,var(--e) 0 1px,transparent 1px 2px)}
+.d{--t:var(--yel);--e:var(--blue);--h:118px}.n{--t:var(--grn);--e:#7f8ea3;--h:130px}.f{--t:var(--fil);--e:#c3ccd8;--h:142px}
+.labs{display:flex;gap:24px;padding:14px 0 0 4px}
+.labs div{font-size:13px;font-weight:600}.labs span{display:flex;align-items:baseline;gap:6px;margin-top:4px;font-size:12px;color:var(--mut);font-weight:400}
+.labs span b{font-size:26px;font-weight:700;color:var(--ink);letter-spacing:-.02em}.labs .z b{color:#b4bfcc}
+.rh{display:flex;justify-content:space-between;align-items:baseline;margin:30px 0 12px}
+.rh h2{font-size:18px;font-weight:600}.rh a{font-size:13px;color:var(--blue);font-weight:500}
+.list{background:#fff;border-radius:8px;box-shadow:0 1px 2px rgba(22,32,46,.06)}
+.r{display:grid;grid-template-columns:14px 1fr 220px 90px 110px 120px;align-items:center;gap:16px;height:56px;padding:0 20px;border-bottom:1px solid #eef1f5;font-size:14px}
+.r i{width:4px;height:24px;border-radius:2px;background:var(--fil)}
+.r .t{font-weight:600}.r .m{color:var(--mut);font-size:13px}.r .q{text-align:right;color:var(--mut);font-size:13px}
+.pill{justify-self:start;font-size:12px;font-weight:600;padding:3px 8px;border-radius:10px;background:#fdf3d0;color:#7a5b00}
+.pill.no{background:#eef1f5;color:var(--mut)}
+</style></head><body>
+<aside class="rail">
+  <div class="logo"><span class="mark"></span>Recall</div>
+  <nav class="nav">
+    <a class="on"><i></i>Dashboard</a><a><i></i>Study</a><a><i></i>Search</a><a><i></i>Statistics</a><a><i></i>Organize</a><a><i></i>Trash</a><a><i></i>Settings</a>
+  </nav>
+  <div class="lib"><h6>LIBRARY</h6>
+    <div>M.Sc. Informatics</div>
+    <div class="l1">Winter semester 2026/27</div>
+    <div class="l2"><b style="background:var(--yel)"></b><span>Computer Vision III</span><em>14</em></div>
+    <div class="l2"><b style="background:var(--yel)"></b><span>Machine Learning</span><em>7</em></div>
+    <div class="l2"><b style="background:var(--yel)"></b><span>Algorithms &amp; Complexity</span><em>2</em></div>
+    <div class="l2"><b style="background:var(--grn)"></b><span>Robotics Lab</span><em>0</em></div>
+    <div class="l1" style="color:#8ea3bf">Summer semester 2026</div>
+  </div>
+  <div class="foot">Offline · saved locally</div>
+</aside>
+<main>
+  <div class="top">
+    <div><h1>Good afternoon.</h1><div class="date">Tuesday, October 13</div></div>
+    <div class="ctl"><div class="sel">Winter semester 2026/27</div><div class="btn">Start session <kbd>S</kbd></div></div>
+  </div>
+  <section class="hero">
+    <div class="hh"><strong>Today's box</strong>
+      <div class="leg"><span><b style="background:var(--yel)"></b>Due</span><span><b style="background:var(--grn)"></b>New</span><span><b style="background:var(--fil)"></b>Filed</span><span>1 card = 2 px</span></div>
+    </div>
+    <div class="stage">
+      <div class="big">23</div>
+      <div class="row">
+        <div class="box"><div class="c d"><div class="s" style="width:28px"></div></div><div class="c n"><div class="s" style="width:12px"></div></div><div class="c f"><div class="s" style="width:124px"></div></div></div>
+        <div class="box"><div class="c d"><div class="s" style="width:14px"></div></div><div class="c n"><div class="s" style="width:24px"></div></div><div class="c f"><div class="s" style="width:80px"></div></div></div>
+        <div class="box"><div class="c d"><div class="s" style="width:4px"></div></div><div class="c n"><div class="s" style="width:0"></div></div><div class="c f"><div class="s" style="width:176px"></div></div></div>
+        <div class="box"><div class="c d"><div class="s" style="width:0"></div></div><div class="c n"><div class="s" style="width:40px"></div></div><div class="c f"><div class="s" style="width:8px"></div></div></div>
+      </div>
+      <div class="bl"><p>cards due today</p><small>38 new waiting · 194 filed · ~18 min</small><span class="btn">Start session</span></div>
+      <div class="labs">
+        <div style="width:204px">Computer Vision III<span><b>14</b>due · 6 new · 62 filed</span></div>
+        <div style="width:158px">Machine Learning<span><b>7</b>due · 12 new · 40 filed</span></div>
+        <div style="width:220px">Algorithms &amp; Complexity<span><b>2</b>due · 0 new · 88 filed</span></div>
+        <div style="width:88px" class="z">Robotics Lab<span><b>0</b>due</span></div>
+      </div>
+    </div>
+  </section>
+  <div class="rh"><h2>Recent sections</h2><a>View all</a></div>
+  <div class="list">
+    <div class="r"><i style="background:var(--yel)"></i><span class="t">Lecture 5 · Epipolar geometry</span><span class="m">Computer Vision III</span><span class="pill">9 due</span><span class="m">24 cards</span><span class="q">Today, 10:42</span></div>
+    <div class="r"><i style="background:var(--yel)"></i><span class="t">Lecture 4 · Kernel methods &amp; SVMs</span><span class="m">Machine Learning</span><span class="pill">5 due</span><span class="m">31 cards</span><span class="q">Yesterday</span></div>
+    <div class="r"><i style="background:var(--grn)"></i><span class="t">Lab 2 · Inverse kinematics</span><span class="m">Robotics Lab</span><span class="pill no">20 new</span><span class="m">20 cards</span><span class="q">Sun, Oct 11</span></div>
+    <div class="r"><i></i><span class="t">Lecture 3 · NP-completeness reductions</span><span class="m">Algorithms &amp; Complexity</span><span class="pill">2 due</span><span class="m">46 cards</span><span class="q">Fri, Oct 9</span></div>
+    <div class="r"><i style="background:var(--yel)"></i><span class="t">Lecture 4 · Camera calibration</span><span class="m">Computer Vision III</span><span class="pill">5 due</span><span class="m">28 cards</span><span class="q">Thu, Oct 8</span></div>
+    <div class="r"><i style="background:var(--grn)"></i><span class="t">Lecture 2 · Bias–variance trade-off</span><span class="m">Machine Learning</span><span class="pill no">12 new</span><span class="m">18 cards</span><span class="q">Tue, Oct 6</span></div>
+  </div>
+</main>
+</body></html>

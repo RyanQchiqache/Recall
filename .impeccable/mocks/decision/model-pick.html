@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1440">
+<title>Recall Dashboard Sketch</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#fff;--ink:#16181c;--ink2:#5b5f66;--ink3:#9a9da3;--rail:#f4f4f2;--line:#e6e6e3;--bad:#ff9ccf;--good:#ffe94d;--vgood:#8fd4ff;--perfect:#8ef0a8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:248px 1fr;height:900px}
+/* rail */
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:28px 20px;display:flex;flex-direction:column;gap:28px}
+.logo{font-size:26px;font-weight:900;letter-spacing:-.04em;padding-left:10px;display:flex;align-items:center;gap:10px}
+.logo i{width:22px;height:22px;background:var(--ink);border-radius:5px;position:relative}
+.logo i:after{content:"";position:absolute;left:4px;right:4px;top:9px;height:5px;background:var(--good);border-radius:2px 4px 2px 3px;transform:rotate(-6deg)}
+nav{display:flex;flex-direction:column;gap:2px}
+nav a{font-size:15px;font-weight:500;color:var(--ink2);padding:9px 10px;border-radius:7px;text-decoration:none;display:flex;justify-content:space-between}
+nav a.on{color:var(--ink);font-weight:700}
+nav a.on span{position:relative;z-index:0}
+nav a.on span:before{content:"";position:absolute;z-index:-1;left:-5px;right:-7px;top:3px;bottom:-1px;background:var(--good);border-radius:3px 9px 4px 11px/7px 4px 9px 5px;transform:rotate(-1.4deg)}
+nav a em{font-style:normal;font-size:12px;font-weight:600;color:var(--ink3)}
+.lib h6{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--ink3);padding:0 10px 10px}
+.tree div{font-size:14px;padding:6px 10px;color:var(--ink2);display:flex;justify-content:space-between}
+.tree .l0{font-weight:700;color:var(--ink)}.tree .l1{padding-left:22px;font-weight:600;color:var(--ink)}.tree .l2{padding-left:32px;font-size:13px;white-space:nowrap}
+.tree b{font-weight:600;font-size:12px;color:var(--ink)}
+.rail .foot{margin-top:auto;font-size:12px;color:var(--ink3);padding-left:10px}
+/* main */
+main{padding:40px 64px 0;display:flex;flex-direction:column}
+header{display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:26px;border-bottom:1.5px solid var(--ink)}
+h1{font-size:44px;font-weight:800;letter-spacing:-.035em;line-height:1}
+.date{font-size:16px;color:var(--ink2);margin-top:10px;font-weight:500}
+.ctrls{display:flex;gap:12px;align-items:center}
+.sel{height:44px;border:1px solid #cfd0cc;border-radius:8px;padding:0 14px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:22px}
+.sel:after{content:"";width:7px;height:7px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-2px) rotate(45deg)}
+.btn{height:44px;padding:0 22px;border-radius:8px;background:var(--ink);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:10px}
+.btn kbd{font:600 11px Inter;color:#b8bbc0;border:1px solid #44474d;border-radius:4px;padding:2px 5px}
+/* hero */
+.hero{display:grid;grid-template-columns:1fr 420px;gap:48px;padding:48px 0 44px;align-items:end}
+.due{display:flex;align-items:flex-end;gap:44px}
+.num{font-size:112px;font-weight:900;letter-spacing:-.06em;line-height:.86;position:relative;z-index:0;padding:0 6px}
+.num:before{content:"";position:absolute;z-index:-1;left:-14px;right:-16px;top:36%;bottom:-10px;background:var(--good);border-radius:10px 26px 8px 30px/18px 10px 24px 12px;transform:rotate(-2.2deg) skewX(-6deg)}
+.due p{font-size:30px;font-weight:800;letter-spacing:-.025em;line-height:1.1;padding-bottom:6px}
+.due p span{display:block;font-size:15px;font-weight:500;color:var(--ink2);letter-spacing:0;margin-top:8px}
+.week h6,.sec h6{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink3);margin-bottom:12px}
+.wk{display:flex;height:30px;gap:3px}
+.wk i,.bar i{display:block;height:100%}
+.legend{display:flex;justify-content:space-between;margin-top:12px;font-size:13px;font-weight:600}
+.legend span{display:flex;align-items:center;gap:7px}.legend b{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.p{background:var(--bad)}.y{background:var(--good)}.bl{background:var(--vgood)}.g{background:var(--perfect)}
+.s1{border-radius:3px 8px 4px 10px/6px 3px 8px 4px;transform:rotate(-.8deg)}
+.s2{border-radius:8px 3px 9px 4px/4px 8px 3px 7px;transform:rotate(.6deg)}
+.s3{border-radius:4px 10px 3px 8px/8px 4px 6px 3px;transform:rotate(-.4deg)}
+.s4{border-radius:9px 4px 8px 3px/3px 7px 4px 9px;transform:rotate(.9deg)}
+/* courses */
+.sec{border-top:1px solid var(--line);padding-top:20px}
+.sec h6{display:flex;justify-content:space-between}
+.cols,.row{display:grid;grid-template-columns:280px 1fr 70px 70px 70px 96px;align-items:center;gap:24px}
+.cols{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ink3);padding:0 0 8px}
+.cols span:nth-child(n+3){text-align:right}
+.row{height:66px;border-top:1px solid var(--line)}
+.row .n{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.row .n small{display:block;font-size:13px;font-weight:500;color:var(--ink2);margin-top:3px}
+.bar{display:flex;height:16px;gap:2px}
+.row .c{text-align:right;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.row .c.mute{color:var(--ink3);font-weight:600}
+.sb{height:36px;border:1.5px solid var(--ink);border-radius:7px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.recent{margin-top:26px}
+.rc{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{border:1px solid var(--line);border-radius:10px;padding:18px 20px;height:120px}
+.card .t{font-size:17px;font-weight:700}.card .m{font-size:13px;color:var(--ink2);margin-top:4px}
+.card .bar{height:10px;margin-top:26px}
+</style></head><body>
+<div class="app">
+<aside class="rail">
+  <div class="logo"><i></i>Recall</div>
+  <nav>
+    <a class="on" href="#"><span>Dashboard</span></a>
+    <a href="#">Study <em>23</em></a><a href="#">Search <em>⌘K</em></a><a href="#">Statistics</a>
+    <a href="#">Organize</a><a href="#">Trash</a><a href="#">Settings</a>
+  </nav>
+  <div class="lib"><h6>LIBRARY</h6>
+    <div class="tree">
+      <div class="l0">M.Sc. Informatics</div>
+      <div class="l1">Winter semester 2026/27</div>
+      <div class="l2">Computer Vision III <b>9</b></div>
+      <div class="l2">Machine Learning <b>7</b></div>
+      <div class="l2">Algorithms &amp; Complexity <b>5</b></div>
+      <div class="l2">Robotics Lab <b>2</b></div>
+      <div class="l1" style="color:var(--ink3);font-weight:500">Summer semester 2026</div>
+    </div>
+  </div>
+  <div class="foot">Offline · saved locally 14:02</div>
+</aside>
+<main>
+  <header>
+    <div><h1>Good afternoon.</h1><div class="date">Tuesday, October 13</div></div>
+    <div class="ctrls"><div class="sel">Winter semester 2026/27</div><div class="btn">Start session <kbd>S</kbd></div></div>
+  </header>
+  <section class="hero">
+    <div class="due"><div class="num">23</div><p>cards due today<span>9 in Computer Vision III · about 14 minutes</span></p></div>
+    <div class="week"><h6>LAST 7 DAYS · 412 RATINGS</h6>
+      <div class="wk"><i class="p s1" style="flex:9"></i><i class="y s2" style="flex:24"></i><i class="bl s3" style="flex:36"></i><i class="g s4" style="flex:31"></i></div>
+      <div class="legend"><span><b>9%</b>Bad</span><span><b>24%</b>Good</span><span><b>36%</b>Very good</span><span><b>31%</b>Perfect</span></div>
+    </div>
+  </section>
+  <section class="sec">
+    <h6><span>COURSES · WINTER 2026/27</span><span>4 COURSES · 1,184 CARDS</span></h6>
+    <div class="cols"><span>COURSE</span><span>LAST RATINGS</span><span>DUE</span><span>NEW</span><span>TOTAL</span><span></span></div>
+    <div class="row"><div class="n">Computer Vision III<small>Prof. Cremers · Lecture 6 of 13</small></div>
+      <div class="bar"><i class="p s1" style="flex:10"></i><i class="y s2" style="flex:20"></i><i class="bl s3" style="flex:35"></i><i class="g s4" style="flex:35"></i></div>
+      <div class="c">9</div><div class="c">12</div><div class="c mute">342</div><div class="sb">Study</div></div>
+    <div class="row"><div class="n">Machine Learning<small>Prof. Günnemann · Lecture 5 of 14</small></div>
+      <div class="bar"><i class="p s2" style="flex:18"></i><i class="y s3" style="flex:30"></i><i class="bl s4" style="flex:32"></i><i class="g s1" style="flex:20"></i></div>
+      <div class="c">7</div><div class="c">20</div><div class="c mute">418</div><div class="sb">Study</div></div>
+    <div class="row"><div class="n">Algorithms &amp; Complexity<small>Prof. Albers · Lecture 6 of 12</small></div>
+      <div class="bar"><i class="p s3" style="flex:6"></i><i class="y s4" style="flex:16"></i><i class="bl s1" style="flex:38"></i><i class="g s2" style="flex:40"></i></div>
+      <div class="c">5</div><div class="c">0</div><div class="c mute">286</div><div class="sb">Study</div></div>
+    <div class="row"><div class="n">Robotics Lab<small>Lab sessions · Week 3</small></div>
+      <div class="bar"><i class="p s4" style="flex:24"></i><i class="y s1" style="flex:34"></i><i class="bl s2" style="flex:28"></i><i class="g s3" style="flex:14"></i></div>
+      <div class="c">2</div><div class="c">8</div><div class="c mute">138</div><div class="sb">Study</div></div>
+  </section>
+  <section class="sec recent">
+    <h6><span>RECENT SECTIONS</span><span>VIEW ALL</span></h6>
+    <div class="rc">
+      <div class="card"><div class="t">6.2 Epipolar geometry</div><div class="m">Computer Vision III · studied 2 h ago</div>
+        <div class="bar"><i class="p s1" style="flex:14"></i><i class="y s2" style="flex:22"></i><i class="bl s3" style="flex:40"></i><i class="g s4" style="flex:24"></i></div></div>
+      <div class="card"><div class="t">5.3 Kernel methods</div><div class="m">Machine Learning · yesterday</div>
+        <div class="bar"><i class="p s2" style="flex:26"></i><i class="y s3" style="flex:34"></i><i class="bl s4" style="flex:26"></i><i class="g s1" style="flex:14"></i></div></div>
+      <div class="card"><div class="t">4.1 NP-completeness</div><div class="m">Algorithms &amp; Complexity · Oct 11</div>
+        <div class="bar"><i class="p s3" style="flex:4"></i><i class="y s4" style="flex:12"></i><i class="bl s1" style="flex:34"></i><i class="g s2" style="flex:50"></i></div></div>
+    </div>
+  </section>
+</main>
+</div>
+</body></html>

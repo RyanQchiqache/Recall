@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Recall Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f8;--surface:#fff;--text:#111827;--muted:#6b7280;--faint:#9ca3af;--line:#e5e7eb;--line2:#eef0f3;--accent:#2563eb;--accent-soft:#eff4ff;--shadow:0 1px 2px rgba(17,24,39,.04),0 1px 3px rgba(17,24,39,.06)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;display:flex;font-feature-settings:"cv11","ss01"}
+svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+aside{width:248px;height:900px;background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 10px 18px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+.mark{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#fff}
+.mark svg{width:15px;height:15px;stroke-width:2.2}
+.search{display:flex;align-items:center;gap:8px;margin:0 4px 14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;color:var(--faint);font-size:13px}
+.search kbd{margin-left:auto;font:500 11px Inter,system-ui,sans-serif;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+nav a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:#374151;text-decoration:none;font-weight:500;font-size:13.5px}
+nav a svg{color:var(--faint)}
+nav a.on{background:var(--accent-soft);color:var(--accent)}
+nav a.on svg{color:var(--accent)}
+nav a .n{margin-left:auto;font-size:12px;color:var(--muted);font-weight:500}
+.label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:22px 10px 8px}
+.tree div{display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:6px;font-size:13px;color:#374151}
+.tree svg{width:14px;height:14px;color:var(--faint)}
+.tree .l1{padding-left:18px}.tree .l2{padding-left:36px;color:var(--muted);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:3px;flex:none}
+.tree .l2 b{margin-left:auto;padding-left:10px;font-weight:500;font-size:12px;color:var(--faint)}
+.tree .l2 b.due{color:var(--accent)}
+.foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid var(--line2);font-size:12.5px;color:var(--muted)}
+.foot i{width:7px;height:7px;border-radius:50%;background:#10b981}
+main{flex:1;padding:36px 48px;overflow:hidden}
+header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px}
+h1{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.date{color:var(--muted);margin-top:4px}
+.actions{display:flex;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;font:500 13.5px Inter,system-ui,sans-serif;border:1px solid var(--line);background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.25)}
+.btn.primary kbd{font:500 11px Inter,system-ui,sans-serif;background:rgba(255,255,255,.18);border-radius:4px;padding:1px 5px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.stat{padding:18px 20px;display:flex;align-items:center;gap:16px}
+.ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--bg);color:var(--muted)}
+.ico.a{background:var(--accent-soft);color:var(--accent)}
+.ico svg{width:19px;height:19px}
+.stat .k{font-size:13px;color:var(--muted);font-weight:500}
+.stat .v{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:6px}
+.week{margin-left:auto;display:flex;gap:4px;align-items:flex-end}
+.week span{width:8px;border-radius:2px;background:var(--accent)}
+.week span.off{background:var(--line)}
+.sec{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+.sec h2{font-size:15px;font-weight:600}
+.sec span{font-size:13px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.course{padding:20px 22px 18px}
+.top{display:flex;align-items:flex-start;gap:12px}
+.top .dot{width:10px;height:10px;margin-top:6px}
+.top h3{font-size:15.5px;font-weight:600;letter-spacing:-.01em}
+.top p{font-size:12.5px;color:var(--muted);margin-top:2px}
+.more{margin-left:auto;color:var(--faint)}
+.nums{display:flex;gap:28px;margin:18px 0 16px}
+.nums div{font-size:12.5px;color:var(--muted)}
+.nums b{display:block;font-size:20px;font-weight:600;color:var(--text);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.nums .due b{color:var(--accent)}
+.nums .zero b{color:var(--faint)}
+.bar{height:6px;border-radius:99px;background:#eef0f3;overflow:hidden;display:flex}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.l{background:#93b4f5}
+.row{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.row span{font-size:12.5px;color:var(--muted)}
+.row .btn{height:32px;font-size:13px}
+.row .btn.ghost{box-shadow:none;color:var(--muted)}
+</style></head>
+<body>
+<aside>
+  <div class="logo"><div class="mark"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="13" height="14" rx="2"/><path d="M8 3h10a2 2 0 0 1 2 2v12"/></svg></div>Recall</div>
+  <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search cards<kbd>⌘K</kbd></div>
+  <nav>
+    <a class="on"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
+    <a><svg viewBox="0 0 24 24"><path d="M2 6.5 12 3l10 3.5-10 3.5z"/><path d="M6 8.5V14c0 1.7 2.7 3 6 3s6-1.3 6-3V8.5"/></svg>Study<span class="n">23</span></a>
+    <a><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</a>
+    <a><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Statistics</a>
+    <a><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Organize</a>
+    <a><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Trash<span class="n">3</span></a>
+    <a><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+  </nav>
+  <div class="label">Library</div>
+  <div class="tree">
+    <div><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>M.Sc. Informatics</div>
+    <div class="l1"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>Winter semester 2026/27</div>
+    <div class="l2"><span class="dot" style="background:#2563eb"></span>Computer Vision III<b class="due">14</b></div>
+    <div class="l2"><span class="dot" style="background:#7c3aed"></span>Machine Learning<b class="due">7</b></div>
+    <div class="l2"><span class="dot" style="background:#0d9488"></span>Algorithms &amp; Complexity<b class="due">2</b></div>
+    <div class="l2"><span class="dot" style="background:#ea580c"></span>Robotics Lab<b>–</b></div>
+    <div class="l1" style="color:var(--muted)"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>Summer semester 2026</div>
+  </div>
+  <div class="foot"><i></i>Saved locally · 255 cards</div>
+</aside>
+<main>
+  <header>
+    <div><h1>Good afternoon.</h1><div class="date">Tuesday, October 13</div></div>
+    <div class="actions">
+      <button class="btn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Create course</button>
+      <button class="btn primary"><svg viewBox="0 0 24 24" style="fill:#fff;stroke:none"><path d="M7 4.5v15l12-7.5z"/></svg>Start session<kbd>S</kbd></button>
+    </div>
+  </header>
+  <section class="stats">
+    <div class="card stat"><div class="ico a"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="k">Due today</div><div class="v">23<small>about 12 min</small></div></div></div>
+    <div class="card stat"><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg></div><div><div class="k">New cards</div><div class="v">38<small>20 per day limit</small></div></div></div>
+    <div class="card stat"><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5 1-8.5z"/></svg></div><div><div class="k">Streak</div><div class="v">6<small>days</small></div></div>
+      <div class="week"><span style="height:14px"></span><span style="height:20px"></span><span style="height:12px"></span><span style="height:22px"></span><span style="height:16px"></span><span style="height:18px"></span><span class="off" style="height:6px"></span></div></div>
+  </section>
+  <div class="sec"><h2>Courses</h2><span>Winter semester 2026/27 · 4 courses</span></div>
+  <section class="grid">
+    <div class="card course">
+      <div class="top"><span class="dot" style="background:#2563eb"></span><div><h3>Computer Vision III</h3><p>Lecture · last studied yesterday</p></div><svg class="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div>
+      <div class="nums"><div class="due"><b>14</b>due</div><div><b>6</b>new</div><div><b>82</b>cards</div></div>
+      <div class="bar"><i style="width:61%"></i><i class="l" style="width:12%"></i></div>
+      <div class="row"><span>61% mature · 10 learning</span><button class="btn primary"><svg viewBox="0 0 24 24" style="fill:#fff;stroke:none"><path d="M7 4.5v15l12-7.5z"/></svg>Study</button></div>
+    </div>
+    <div class="card course">
+      <div class="top"><span class="dot" style="background:#7c3aed"></span><div><h3>Machine Learning</h3><p>Lecture · last studied 2 days ago</p></div><svg class="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div>
+      <div class="nums"><div class="due"><b>7</b>due</div><div><b>12</b>new</div><div><b>59</b>cards</div></div>
+      <div class="bar"><i style="width:48%"></i><i class="l" style="width:15%"></i></div>
+      <div class="row"><span>48% mature · 9 learning</span><button class="btn primary"><svg viewBox="0 0 24 24" style="fill:#fff;stroke:none"><path d="M7 4.5v15l12-7.5z"/></svg>Study</button></div>
+    </div>
+    <div class="card course">
+      <div class="top"><span class="dot" style="background:#0d9488"></span><div><h3>Algorithms &amp; Complexity</h3><p>Lecture · last studied today</p></div><svg class="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div>
+      <div class="nums"><div class="due"><b>2</b>due</div><div class="zero"><b>0</b>new</div><div><b>90</b>cards</div></div>
+      <div class="bar"><i style="width:87%"></i><i class="l" style="width:6%"></i></div>
+      <div class="row"><span>87% mature · 5 learning</span><button class="btn"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Study</button></div>
+    </div>
+    <div class="card course">
+      <div class="top"><span class="dot" style="background:#ea580c"></span><div><h3>Robotics Lab</h3><p>Lab course · added 3 days ago</p></div><svg class="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div>
+      <div class="nums"><div class="zero"><b>0</b>due</div><div><b>20</b>new</div><div><b>24</b>cards</div></div>
+      <div class="bar"><i style="width:8%"></i><i class="l" style="width:9%"></i></div>
+      <div class="row"><span>All caught up · 20 cards to learn</span><button class="btn"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Study</button></div>
+    </div>
+  </section>
+</main>
+</body></html>
