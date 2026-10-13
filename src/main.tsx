@@ -14,6 +14,7 @@ import { EmptyState } from './components/ui/Feedback.tsx';
 import { ToastProvider } from './components/ui/Toast.tsx';
 import { TooltipProvider } from './components/ui/Tooltip.tsx';
 import { queryClient, useSettings } from './lib/queries.ts';
+import { applyTheme, cachedPreference, rememberPreference } from './lib/theme.ts';
 import { CardEditor } from './pages/CardEditor.tsx';
 import { CoursePage } from './pages/CoursePage.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
@@ -27,30 +28,15 @@ import { StatsPage } from './pages/StatsPage.tsx';
 import { StudyScreen } from './pages/StudyScreen.tsx';
 import { TrashPage } from './pages/TrashPage.tsx';
 
-const THEME_KEY = 'recall.theme';
-
-function applyTheme(pref: string) {
-  const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', dark);
-}
-
 // Apply the cached preference before first paint to avoid a flash.
-try {
-  applyTheme(localStorage.getItem(THEME_KEY) ?? 'system');
-} catch {
-  applyTheme('system');
-}
+applyTheme(cachedPreference());
 
 function ThemeSync() {
   const settings = useSettings();
-  const pref = settings.data?.theme ?? 'system';
+  const pref = settings.data?.theme ?? cachedPreference();
   useEffect(() => {
     applyTheme(pref);
-    try {
-      localStorage.setItem(THEME_KEY, pref);
-    } catch {
-      /* disposable */
-    }
+    rememberPreference(pref);
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => applyTheme(pref);
     mq.addEventListener('change', onChange);

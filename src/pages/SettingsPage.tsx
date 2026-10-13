@@ -1,5 +1,5 @@
 import { Archive, Database, Download, FlaskConical, HardDrive, Info, Package, RotateCcw, Save, ShieldCheck, Upload } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { AppSettings } from '../../shared/settings.ts';
 import type { RestorePreview, SnapshotInfo } from '../../shared/types.ts';
@@ -12,6 +12,7 @@ import { useToast } from '../components/ui/Toast.tsx';
 import { api, downloadUrl, errorMessage } from '../lib/api.ts';
 import { formatBytes, formatDateTime } from '../lib/format.ts';
 import { invalidateContent, queryClient, useDashboard, useSettings, useSnapshots, useSystem, useTree } from '../lib/queries.ts';
+import { setThemePreference } from '../lib/theme.ts';
 
 const NAV = [
   { id: 'appearance', label: 'Appearance' },
@@ -49,8 +50,15 @@ function SettingsForm({ initial }: { initial: AppSettings }) {
   const [s, setS] = useState<AppSettings>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setS(initial), [initial]);
-  const dirty = JSON.stringify(s) !== JSON.stringify(initial);
+  // The theme applies instantly on its own, so it is not part of the form's unsaved state.
+  const formKey = (x: AppSettings) => JSON.stringify({ ...x, theme: null });
+  const lastInitial = useRef(initial);
+  useEffect(() => {
+    // Pick up outside changes (e.g. snapshot settings saved below) without discarding unsaved edits.
+    setS((prev) => (formKey(prev) === formKey(lastInitial.current) ? initial : prev));
+    lastInitial.current = initial;
+  }, [initial]);
+  const dirty = formKey(s) !== formKey(initial);
   const timeZones = useMemo(() => {
     try {
       return (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone');
@@ -63,7 +71,8 @@ function SettingsForm({ initial }: { initial: AppSettings }) {
     setSaving(true);
     setError(null);
     try {
-      const next = await api.patch<AppSettings>('/api/settings', s);
+      const { theme: _theme, ...rest } = s;
+      const next = await api.patch<AppSettings>('/api/settings', rest);
       queryClient.setQueryData(['settings'], next);
       invalidateContent();
       toast.success('Settings saved');
@@ -101,8 +110,8 @@ function SettingsForm({ initial }: { initial: AppSettings }) {
                 <span className="text-sm font-medium text-text-2">Theme</span>
                 <Segmented
                   ariaLabel="Theme"
-                  value={s.theme}
-                  onChange={(theme) => setS({ ...s, theme })}
+                  value={initial.theme}
+                  onChange={(theme) => setThemePreference(theme)}
                   options={[
                     { value: 'system', label: 'System' },
                     { value: 'light', label: 'Light' },

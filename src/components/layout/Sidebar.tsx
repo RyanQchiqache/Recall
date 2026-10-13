@@ -1,8 +1,8 @@
 import { BarChart3, ChevronRight, FolderTree, LayoutDashboard, Moon, Play, Plus, Search, Settings, Sun, Trash2 } from 'lucide-react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import type { TreeProgram } from '../../../shared/types.ts';
-import { api } from '../../lib/api.ts';
-import { queryClient, useOpenSession, useSettings, useTree } from '../../lib/queries.ts';
+import { useOpenSession, useSettings, useTree } from '../../lib/queries.ts';
+import { setThemePreference, useIsDark } from '../../lib/theme.ts';
 import { cn, courseVars, usePersistentState } from '../../lib/util.ts';
 import { useHierarchy } from '../HierarchyDialogs.tsx';
 import { Kbd } from '../ui/Feedback.tsx';
@@ -23,7 +23,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const tree = useTree();
   const h = useHierarchy();
   const navigate = useNavigate();
-  const dark = document.documentElement.classList.contains('dark');
+  const dark = useIsDark();
   const totals = (tree.data ?? []).reduce((t, p) => ({ due: t.due + p.counts.due, total: t.total + p.counts.total }), { due: 0, total: 0 });
 
   return (
@@ -111,11 +111,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <button
           className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-text"
           aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-          onClick={async () => {
-            const theme = dark ? 'light' : 'dark';
-            await api.patch('/api/settings', { theme });
-            queryClient.invalidateQueries({ queryKey: ['settings'] });
-          }}
+          onClick={() => setThemePreference(dark ? 'light' : 'dark')}
         >
           {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
