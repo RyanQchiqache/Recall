@@ -154,9 +154,9 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
       prefix: '/',
       wildcard: false,
       index: ['index.html'],
-      setHeaders: (res, filePath) => {
-        if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        else res.setHeader('Cache-Control', 'no-cache');
+      setHeaders: (reply, filePath) => {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        else reply.header('Cache-Control', 'no-cache');
       },
     });
   }

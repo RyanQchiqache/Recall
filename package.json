@@ -2,7 +2,7 @@
   "name": "recall",
   "version": "1.0.0",
   "private": true,
-  "description": "Recall — a local, offline, single-user flashcard workspace for university study.",
+  "description": "Recall \u2014 a local, offline, single-user flashcard workspace for university study.",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^9.4.0",
-    "@fastify/static": "^8.3.0",
+    "@fastify/static": "^10.1.6",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@tanstack/react-query": "^5.104.2",
@@ -27,7 +27,7 @@
     "fastify": "^5.12.7",
     "fflate": "^0.8.3",
     "highlight.js": "^11.12.0",
-    "katex": "^0.16.47",
+    "katex": "^0.18.11",
     "lucide-react": "^0.577.0",
     "papaparse": "^5.7.0",
     "radix-ui": "^1.8.1",
@@ -54,10 +54,14 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "vite": "^7.3.7",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": false
+  },
+  "overrides": {
+    "katex": "$katex"
   }
 }

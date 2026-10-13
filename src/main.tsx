@@ -1,0 +1,139 @@
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
+import 'katex/dist/katex.min.css';
+import './index.css';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { createBrowserRouter, Outlet, useRouteError } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+import { HierarchyDialogs } from './components/HierarchyDialogs.tsx';
+import { AppShell } from './components/layout/AppShell.tsx';
+import { Button, LinkButton } from './components/ui/Button.tsx';
+import { EmptyState } from './components/ui/Feedback.tsx';
+import { ToastProvider } from './components/ui/Toast.tsx';
+import { TooltipProvider } from './components/ui/Tooltip.tsx';
+import { queryClient, useSettings } from './lib/queries.ts';
+import { CardEditor } from './pages/CardEditor.tsx';
+import { CoursePage } from './pages/CoursePage.tsx';
+import { Dashboard } from './pages/Dashboard.tsx';
+import { Organizer } from './pages/Organizer.tsx';
+import { SearchPage } from './pages/SearchPage.tsx';
+import { SectionPage } from './pages/SectionPage.tsx';
+import { SessionBuilder } from './pages/SessionBuilder.tsx';
+import { SessionResultsPage } from './pages/SessionResults.tsx';
+import { SettingsPage } from './pages/SettingsPage.tsx';
+import { StatsPage } from './pages/StatsPage.tsx';
+import { StudyScreen } from './pages/StudyScreen.tsx';
+import { TrashPage } from './pages/TrashPage.tsx';
+
+const THEME_KEY = 'recall.theme';
+
+function applyTheme(pref: string) {
+  const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', dark);
+}
+
+// Apply the cached preference before first paint to avoid a flash.
+try {
+  applyTheme(localStorage.getItem(THEME_KEY) ?? 'system');
+} catch {
+  applyTheme('system');
+}
+
+function ThemeSync() {
+  const settings = useSettings();
+  const pref = settings.data?.theme ?? 'system';
+  useEffect(() => {
+    applyTheme(pref);
+    try {
+      localStorage.setItem(THEME_KEY, pref);
+    } catch {
+      /* disposable */
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyTheme(pref);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [pref]);
+  return null;
+}
+
+function Root() {
+  return (
+    <HierarchyDialogs>
+      <ThemeSync />
+      <Outlet />
+    </HierarchyDialogs>
+  );
+}
+
+function RouteError() {
+  const error = useRouteError() as Error | undefined;
+  return (
+    <div className="mx-auto max-w-xl px-4 py-20">
+      <EmptyState
+        title="This page hit an error"
+        action={
+          <>
+            <Button onClick={() => window.location.reload()}>Reload</Button>
+            <LinkButton to="/" variant="primary">
+              Go to dashboard
+            </LinkButton>
+          </>
+        }
+      >
+        {error?.message ?? 'Unknown error'}. Your data is stored safely in the local database.
+      </EmptyState>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <EmptyState title="Page not found" action={<LinkButton to="/">Back to dashboard</LinkButton>}>
+      This page doesn’t exist, or the item was deleted.
+    </EmptyState>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    element: <Root />,
+    errorElement: <RouteError />,
+    children: [
+      { path: '/study/:id', element: <StudyScreen /> },
+      {
+        element: <AppShell />,
+        errorElement: <RouteError />,
+        children: [
+          { path: '/', element: <Dashboard /> },
+          { path: '/organize', element: <Organizer /> },
+          { path: '/courses/:id', element: <CoursePage /> },
+          { path: '/sections/:id', element: <SectionPage /> },
+          { path: '/cards/new', element: <CardEditor /> },
+          { path: '/cards/:id/edit', element: <CardEditor /> },
+          { path: '/study/new', element: <SessionBuilder /> },
+          { path: '/study/:id/results', element: <SessionResultsPage /> },
+          { path: '/search', element: <SearchPage /> },
+          { path: '/stats', element: <StatsPage /> },
+          { path: '/settings', element: <SettingsPage /> },
+          { path: '/trash', element: <TrashPage /> },
+          { path: '*', element: <NotFound /> },
+        ],
+      },
+    ],
+  },
+]);
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </StrictMode>,
+);

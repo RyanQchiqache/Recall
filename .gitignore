@@ -9,3 +9,6 @@ data/
 test-results/
 playwright-report/
 docs/screenshots/*.tmp.png
+
+# Impeccable platform binary (16 MB); the launcher downloads it on first run
+.claude/skills/impeccable/scripts/bin/

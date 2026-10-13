@@ -545,12 +545,16 @@ export function resolveCurrentSemester(ctx: Ctx): (SemesterRow & { program_title
     if (row) return row as SemesterRow & { program_title: string };
   }
   const d = today(ctx);
-  const dated = ctx.db
-    .prepare(`${base} AND se.start_date IS NOT NULL AND se.start_date <= ? AND (se.end_date IS NULL OR se.end_date >= ?) ORDER BY se.start_date DESC LIMIT 1`)
-    .get(d, d);
-  if (dated) return dated as SemesterRow & { program_title: string };
-  const latest = ctx.db.prepare(`${base} ORDER BY se.created_at DESC LIMIT 1`).get();
-  return (latest as (SemesterRow & { program_title: string }) | undefined) ?? null;
+  // The user's own semesters win over demo content; then a semester whose dates include today; then the newest.
+  for (const demo of [0, 1]) {
+    const dated = ctx.db
+      .prepare(`${base} AND se.is_demo = ? AND se.start_date IS NOT NULL AND se.start_date <= ? AND (se.end_date IS NULL OR se.end_date >= ?) ORDER BY se.start_date DESC LIMIT 1`)
+      .get(demo, d, d);
+    if (dated) return dated as SemesterRow & { program_title: string };
+    const latest = ctx.db.prepare(`${base} AND se.is_demo = ? ORDER BY se.created_at DESC LIMIT 1`).get(demo);
+    if (latest) return latest as SemesterRow & { program_title: string };
+  }
+  return null;
 }
 
 export function assertExists(ctx: Ctx, level: Level, id: string) {
