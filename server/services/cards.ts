@@ -166,6 +166,23 @@ export function duplicateCard(ctx: Ctx, id: string): Card {
   });
 }
 
+export function reorderCards(ctx: Ctx, input: unknown) {
+  const data = parse(z.object({ sectionId: zId, ids: z.array(zId).min(1).max(5000) }), input);
+  if (new Set(data.ids).size !== data.ids.length) throw badRequest('Each card may appear only once in the order');
+  assertSectionWritable(ctx, data.sectionId);
+  const siblings = ctx.db
+    .prepare('SELECT id FROM cards WHERE section_id = ? ORDER BY position, created_at, id')
+    .all(data.sectionId) as { id: string }[];
+  const siblingIds = new Set(siblings.map((card) => card.id));
+  for (const id of data.ids) if (!siblingIds.has(id)) throw badRequest('All reordered cards must belong to the same section');
+  const listed = new Set(data.ids);
+  const finalOrder = [...data.ids, ...siblings.map((card) => card.id).filter((id) => !listed.has(id))];
+  const update = ctx.db.prepare('UPDATE cards SET position = ?, updated_at = ? WHERE id = ?');
+  const ts = nowIso(ctx);
+  ctx.db.transaction(() => finalOrder.forEach((id, position) => update.run(position, ts, id)))();
+  return { ok: true };
+}
+
 export interface ListQuery {
   sectionId?: string;
   courseId?: string;

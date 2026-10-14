@@ -74,6 +74,19 @@ export function SectionPage() {
       toast.error(errorMessage(e));
     }
   };
+  const reorder = async (cardId: string, direction: -1 | 1) => {
+    const index = all.findIndex((card) => card.id === cardId);
+    const neighbour = all[index + direction];
+    if (index < 0 || !neighbour) return;
+    const ordered = all.map((card) => card.id);
+    [ordered[index], ordered[index + direction]] = [ordered[index + direction], ordered[index]];
+    try {
+      await api.post('/api/cards/reorder', { sectionId: s.id, ids: ordered });
+      invalidateContent();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
   const setArchived = async (archived: boolean) => {
     try {
       await api.patch(`/api/sections/${s.id}`, { archived });
@@ -204,8 +217,17 @@ export function SectionPage() {
             <span>{plural(list.length, 'card')}</span>
           </div>
           <ul className="divide-y divide-border">
-            {list.map((c) => (
-              <CardRow key={c.id} card={c} today={today} selected={selected.has(c.id)} onToggle={() => toggle(c.id)} />
+            {list.map((c, index) => (
+              <CardRow
+                key={c.id}
+                card={c}
+                today={today}
+                selected={selected.has(c.id)}
+                onToggle={() => toggle(c.id)}
+                onMove={filter === 'all' && !q ? (direction) => reorder(c.id, direction) : undefined}
+                first={index === 0}
+                last={index === list.length - 1}
+              />
             ))}
           </ul>
         </Panel>

@@ -150,3 +150,39 @@ describe('course package import', () => {
     expect(byFront.get('Q 1.2')?.schedule?.dueDate).toBe('2026-10-20');
   });
 });
+
+describe('card ordering', () => {
+  it('reorders cards within a section and preserves the order in a course package', async () => {
+    const a = await app();
+    const h = await seedHierarchy(a, [3]);
+    const [first, second, third] = h.sections[0].cardIds;
+
+    const reordered = await a.api('POST', '/api/cards/reorder', {
+      sectionId: h.sections[0].id,
+      ids: [third, first, second],
+    });
+    expect(reordered.status).toBe(200);
+    const cards = (await a.api('GET', `/api/cards?sectionId=${h.sections[0].id}`)).body.cards;
+    expect(cards.map((card: { id: string }) => card.id)).toEqual([third, first, second]);
+
+    const exported = await a.raw('GET', `/api/export/course/${h.course.id}`);
+    const preview = await a.upload('/api/restore/preview', 'ordered-course.zip', exported.buffer);
+    const imported = await a.api('POST', '/api/import/package', {
+      token: preview.body.token,
+      semesterId: h.semester.id,
+      includeSchedules: false,
+    });
+    const importedCards = (await a.api('GET', `/api/cards?courseId=${imported.body.courseId}`)).body.cards;
+    expect(importedCards.map((card: { front: string }) => card.front)).toEqual(['Q 1.3', 'Q 1.1', 'Q 1.2']);
+  });
+
+  it('rejects cards from another section', async () => {
+    const a = await app();
+    const h = await seedHierarchy(a, [1, 1]);
+    const result = await a.api('POST', '/api/cards/reorder', {
+      sectionId: h.sections[0].id,
+      ids: [h.sections[1].cardIds[0]],
+    });
+    expect(result.status).toBe(400);
+  });
+});

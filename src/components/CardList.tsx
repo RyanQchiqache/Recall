@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkMinus, Copy, FolderInput, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bookmark, BookmarkMinus, Copy, FolderInput, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { Card } from '../../shared/types.ts';
@@ -7,7 +7,7 @@ import { formatDate, mdPreview, plural, relativeDay } from '../lib/format.ts';
 import { invalidateContent, useTree } from '../lib/queries.ts';
 import { cn } from '../lib/util.ts';
 import { RatingBadge } from './ratingUi.tsx';
-import { Button } from './ui/Button.tsx';
+import { Button, IconButton } from './ui/Button.tsx';
 import { Alert, Badge } from './ui/Feedback.tsx';
 import { Field, Input, Select, Segmented } from './ui/Form.tsx';
 import { Modal } from './ui/Dialog.tsx';
@@ -62,7 +62,23 @@ export function CardRowCompact({ card, today, showSection }: { card: Card; today
   );
 }
 
-export function CardRow({ card, today, selected, onToggle }: { card: Card; today: string; selected: boolean; onToggle: () => void }) {
+export function CardRow({
+  card,
+  today,
+  selected,
+  onToggle,
+  onMove,
+  first,
+  last,
+}: {
+  card: Card;
+  today: string;
+  selected: boolean;
+  onToggle: () => void;
+  onMove?: (direction: -1 | 1) => void;
+  first?: boolean;
+  last?: boolean;
+}) {
   const navigate = useNavigate();
   const toast = useToast();
   const h = useHierarchy();
@@ -92,6 +108,16 @@ export function CardRow({ card, today, selected, onToggle }: { card: Card; today
         </div>
       </Link>
       <div className="flex shrink-0 items-center">
+        {onMove && (
+          <>
+            <IconButton size="sm" label="Move card up" onClick={() => onMove(-1)} disabled={first}>
+              <ArrowUp className="size-4" />
+            </IconButton>
+            <IconButton size="sm" label="Move card down" onClick={() => onMove(1)} disabled={last}>
+              <ArrowDown className="size-4" />
+            </IconButton>
+          </>
+        )}
         <Tip content={card.bookmarked ? 'Remove bookmark' : 'Bookmark'}>
           <button
             aria-label={card.bookmarked ? 'Remove bookmark' : 'Bookmark'}

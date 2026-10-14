@@ -134,6 +134,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     reply.code(201);
     return cards.createCard(ctx, body(req));
   });
+  post('/api/cards/reorder', (req) => cards.reorderCards(ctx, body(req)));
   get('/api/cards/:id', (req) => ({
     card: cards.getCard(ctx, req.params.id),
     breadcrumbs: h.breadcrumbs(ctx, 'section', cards.getCard(ctx, req.params.id).sectionId),
