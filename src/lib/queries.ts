@@ -29,7 +29,7 @@ export const queryClient = new QueryClient({
 
 /** Refresh everything that depends on cards / hierarchy. */
 export function invalidateContent() {
-  for (const key of ['tree', 'dashboard', 'course', 'section', 'cards', 'card', 'stats', 'trash', 'tags', 'preview', 'openSession']) {
+  for (const key of ['tree', 'dashboard', 'course', 'section', 'cards', 'card', 'stats', 'trash', 'tags', 'preview', 'openSession', 'session', 'results']) {
     queryClient.invalidateQueries({ queryKey: [key] });
   }
 }
