@@ -49,7 +49,10 @@ export function StudyScreen() {
 
   /** One idempotency key per card presentation — a retry reuses it, so a rating is never applied twice. */
   const idempotencyKey = () => {
-    if (!keyRef.current || keyRef.current.slot !== slot) keyRef.current = { slot, key: uuid() };
+    // The revision is part of the slot: after an Undo the same card and attempt count come back,
+    // and reusing the old key would make the server treat the new rating as a replay.
+    const keySlot = `${slot}:${s?.revision ?? 0}`;
+    if (!keyRef.current || keyRef.current.slot !== keySlot) keyRef.current = { slot: keySlot, key: uuid() };
     return keyRef.current.key;
   };
 
