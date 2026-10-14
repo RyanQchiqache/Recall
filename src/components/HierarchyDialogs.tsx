@@ -372,6 +372,11 @@ function DeleteDialog({ type, id, title, after, onClose }: { type: TrashType; id
           {type !== 'card' && ' and everything inside it'} will be hidden everywhere, including study sessions.
         </p>
         {impact.isLoading && <Spinner />}
+        {impact.error && (
+          <Alert tone="danger" action={<Button size="sm" onClick={() => impact.refetch()}>Retry</Button>}>
+            {errorMessage(impact.error)}
+          </Alert>
+        )}
         {lines.length > 0 && (
           <div className="rounded-xl bg-surface-2 px-4 py-3 text-sm">
             <p className="font-medium">Affected</p>

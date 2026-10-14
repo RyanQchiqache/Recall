@@ -1,7 +1,7 @@
 import { BarChart3, Dumbbell, EyeOff, Flame, Play } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { addDays } from '../../shared/dates.ts';
+import { addDays, diffDays, isLocalDate } from '../../shared/dates.ts';
 import { MODE_LABEL, type StudyMode } from '../../shared/ratings.ts';
 import { DailyBarChart, DistributionBar, Heatmap } from '../components/charts.tsx';
 import { PageHeader, SectionTitle } from '../components/layout/AppShell.tsx';
@@ -34,12 +34,25 @@ export function StatsPage() {
   const [courseId, setCourseId] = useState('');
   const [modeTab, setModeTab] = useState<StudyMode>('scheduled');
 
-  const params = useMemo(() => {
+  const customError = useMemo(() => {
+    if (range !== 'custom' || !today) return null;
+    const end = to || today;
+    const start = from || addDays(end, -29);
+    if (!isLocalDate(start) || !isLocalDate(end)) return 'Enter valid start and end dates.';
+    if (start > end) return 'The start date must be before the end date.';
+    if (diffDays(start, end) > 3660) return 'Choose a range of at most ten years.';
+    return null;
+  }, [range, today, from, to]);
+  const candidateParams = useMemo(() => {
     if (!today) return null;
     const end = range === 'custom' && to ? to : today;
     const start = range === 'custom' && from ? from : addDays(end, -(Number(range === 'custom' ? 30 : range) - 1));
+    if (customError) return null;
     return { from: start, to: end, programId: programId || undefined, semesterId: semesterId || undefined, courseId: courseId || undefined };
-  }, [today, range, from, to, programId, semesterId, courseId]);
+  }, [today, range, from, to, programId, semesterId, courseId, customError]);
+  const lastValidParams = useRef(candidateParams);
+  if (candidateParams) lastValidParams.current = candidateParams;
+  const params = candidateParams ?? lastValidParams.current;
   const stats = useStats(params ?? {});
 
   const programs = tree.data ?? [];
@@ -99,8 +112,9 @@ export function StatsPage() {
               <Input id="st-from" type="date" value={from || d.query.from} max={to || today} onChange={(e) => setFrom(e.target.value)} />
             </Field>
             <Field label="To" htmlFor="st-to">
-              <Input id="st-to" type="date" value={to || d.query.to} max={today} onChange={(e) => setTo(e.target.value)} />
+              <Input id="st-to" type="date" value={to || d.query.to} max={today} aria-invalid={!!customError} onChange={(e) => setTo(e.target.value)} />
             </Field>
+            {customError && <p className="col-span-2 text-sm text-danger" role="alert">{customError}</p>}
           </div>
         )}
         <p className="mt-3 text-sm text-muted">

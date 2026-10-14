@@ -51,11 +51,14 @@ export function CoursePage() {
   const daysToExam = c.examDate && today ? diffDays(today, c.examDate) : null;
   const activeIds = active.map((s) => s.id);
 
-  const reorder = async (index: number, dir: -1 | 1) => {
+  const reorder = async (sectionId: string, dir: -1 | 1) => {
+    const visibleIndex = visible.findIndex((s) => s.id === sectionId);
+    const neighbour = visible[visibleIndex + dir];
+    if (!neighbour) return;
     const ids = allSections.map((s) => s.id);
-    const j = index + dir;
-    if (j < 0 || j >= ids.length) return;
-    [ids[index], ids[j]] = [ids[j], ids[index]];
+    const index = ids.indexOf(sectionId);
+    const neighbourIndex = ids.indexOf(neighbour.id);
+    [ids[index], ids[neighbourIndex]] = [ids[neighbourIndex], ids[index]];
     try {
       await api.post('/api/sections/reorder', { parentId: c.id, ids });
       invalidateContent();
@@ -180,8 +183,8 @@ export function CoursePage() {
           </div>
           {visible.length === 0 && <p className="px-5 py-6 text-muted">No sections match “{query}”.</p>}
           <ul className="divide-y divide-border">
-            {visible.map((s) => (
-              <SectionRow key={s.id} s={s} index={allSections.indexOf(s)} count={allSections.length} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} onMove={reorder} onArchive={setArchived} />
+            {visible.map((s, index) => (
+              <SectionRow key={s.id} s={s} index={index} count={visible.length} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} onMove={reorder} onArchive={setArchived} />
             ))}
           </ul>
         </Panel>
@@ -221,7 +224,7 @@ function SectionRow({
   count: number;
   selected: boolean;
   onToggle: () => void;
-  onMove: (i: number, d: -1 | 1) => void;
+  onMove: (id: string, d: -1 | 1) => void;
   onArchive: (archived: boolean, level: 'section', id: string, title: string) => void;
 }) {
   const h = useHierarchy();
@@ -250,10 +253,10 @@ function SectionRow({
         <span className="text-text-2">{s.counts.total}</span>
       </div>
       <div className="flex w-[116px] shrink-0 items-center justify-end">
-        <IconButton size="sm" label="Move section up" onClick={() => onMove(index, -1)} disabled={index === 0}>
+        <IconButton size="sm" label="Move section up" onClick={() => onMove(s.id, -1)} disabled={index === 0}>
           <ArrowUp className="size-4" />
         </IconButton>
-        <IconButton size="sm" label="Move section down" onClick={() => onMove(index, 1)} disabled={index === count - 1}>
+        <IconButton size="sm" label="Move section down" onClick={() => onMove(s.id, 1)} disabled={index === count - 1}>
           <ArrowDown className="size-4" />
         </IconButton>
         <Menu

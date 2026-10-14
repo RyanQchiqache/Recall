@@ -102,9 +102,9 @@ export function SectionPage() {
         }
         actions={
           <>
-            <LinkButton to={`/study/new?sections=${s.id}`} icon={<Play className="size-4 fill-current" />} aria-disabled={counts.total === 0}>
+            <Button onClick={() => navigate(`/study/new?sections=${s.id}`)} icon={<Play className="size-4 fill-current" />} disabled={counts.total === 0}>
               Study section
-            </LinkButton>
+            </Button>
             <LinkButton to={`/cards/new?section=${s.id}`} variant="primary" icon={<Plus className="size-4" />}>
               Create card
             </LinkButton>

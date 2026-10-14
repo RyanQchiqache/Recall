@@ -1,5 +1,5 @@
 import { ArrowRight, BookOpen, CalendarClock, ChevronDown, Clock3, Flame, FlaskConical, GraduationCap, Inbox, Layers, Play, Plus, Sparkles, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { diffDays } from '../../shared/dates.ts';
 import type { Course, Program, Section, Semester } from '../../shared/types.ts';
@@ -11,29 +11,37 @@ import { Field, Input } from '../components/ui/Form.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { api, errorMessage, qs } from '../lib/api.ts';
 import { formatDate, greeting, plural } from '../lib/format.ts';
-import { invalidateContent, queryClient, useDashboard, useStats, useTree } from '../lib/queries.ts';
+import { invalidateContent, queryClient, useDashboard, useTree } from '../lib/queries.ts';
 import { cn, courseVars } from '../lib/util.ts';
 import type { DashboardData } from '../../shared/types.ts';
 
 export function Dashboard() {
   const dash = useDashboard();
+  const [resumeOnboarding, setResumeOnboarding] = useState(() => readOnboardingState() !== null);
   if (dash.isLoading) return <PageLoader />;
   if (dash.error) return <ErrorState error={dash.error} onRetry={() => dash.refetch()} />;
   const d = dash.data!;
-  if (!d.hasContent) return <Onboarding />;
+  if (!d.hasContent || resumeOnboarding) {
+    return <Onboarding onProgress={() => setResumeOnboarding(true)} onDone={() => setResumeOnboarding(false)} />;
+  }
   return <DashboardContent d={d} />;
 }
 
 function DashboardContent({ d }: { d: DashboardData }) {
   const h = useHierarchy();
   const toast = useToast();
-  const tree = useTree();
+  const tree = useTree(true);
   const navigate = useNavigate();
   const sem = d.currentSemester;
   const studyHref = `/study/new${qs({ semester: sem?.id })}`;
-  const semesters = (tree.data ?? []).flatMap((p) => p.semesters.map((s) => ({ id: s.id, label: `${p.title} › ${s.title}` })));
+  const configuredSemesterId = d.settings.currentSemesterId;
+  const semesters = (tree.data ?? []).flatMap((p) =>
+    p.semesters
+      .filter((s) => !s.archivedAt || s.id === configuredSemesterId)
+      .map((s) => ({ id: s.id, label: `${p.title} › ${s.title}${s.archivedAt ? ' (archived)' : ''}` })),
+  );
+  const selectedSemesterId = configuredSemesterId && semesters.some((s) => s.id === configuredSemesterId) ? configuredSemesterId : sem?.id;
   const os = d.openSession;
-  const streak = useStats({}).data?.streak;
 
   return (
     <>
@@ -53,11 +61,15 @@ function DashboardContent({ d }: { d: DashboardData }) {
                 <select
                   id="current-sem"
                   className="max-w-full cursor-pointer appearance-none truncate rounded-md bg-transparent pr-5 pl-0 font-medium text-text-2 [field-sizing:content] hover:text-text"
-                  value={sem.id}
+                  value={selectedSemesterId}
                   onChange={async (e) => {
-                    await api.patch('/api/settings', { currentSemesterId: e.target.value });
-                    queryClient.invalidateQueries({ queryKey: ['settings'] });
-                    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+                    try {
+                      await api.patch('/api/settings', { currentSemesterId: e.target.value });
+                      queryClient.invalidateQueries({ queryKey: ['settings'] });
+                      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+                    } catch (err) {
+                      toast.error(errorMessage(err));
+                    }
                   }}
                 >
                   {semesters.map((s) => (
@@ -112,7 +124,7 @@ function DashboardContent({ d }: { d: DashboardData }) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className={cn('grid gap-2 sm:gap-3', d.settings.showStreak ? 'grid-cols-3' : 'grid-cols-2')}>
         <StatTile icon={<Clock3 className="size-[18px]" />} label="Due today" value={d.counts.due}>
           {d.counts.due === 0
             ? d.counts.total > 0
@@ -123,15 +135,17 @@ function DashboardContent({ d }: { d: DashboardData }) {
         <StatTile icon={<Inbox className="size-[18px]" />} label="New cards" value={d.counts.new}>
           {d.counts.new > 0 ? 'ready to learn' : 'none waiting'}
         </StatTile>
-        <StatTile
-          icon={<Flame className="size-[18px]" />}
-          label="Streak"
-          value={streak?.current ?? '–'}
-          unit={streak ? (streak.current === 1 ? 'day' : 'days') : undefined}
-          aside={d.activity.some((a) => a.attempts > 0) ? <ActivityBars activity={d.activity} /> : undefined}
-        >
-          {streak && streak.longest > 0 ? `Best ${plural(streak.longest, 'day')}` : 'Study today to start'}
-        </StatTile>
+        {d.settings.showStreak && (
+          <StatTile
+            icon={<Flame className="size-[18px]" />}
+            label="Streak"
+            value={d.streak.current}
+            unit={d.streak.current === 1 ? 'day' : 'days'}
+            aside={d.activity.some((a) => a.attempts > 0) ? <ActivityBars activity={d.activity} /> : undefined}
+          >
+            {d.streak.longest > 0 ? `Best ${plural(d.streak.longest, 'day')}` : 'Study today to start'}
+          </StatTile>
+        )}
       </div>
 
       {os && (
@@ -315,14 +329,47 @@ function CourseCard({ course: c, today, onStudy }: { course: DashboardData['cour
 
 // ---------------- First run ----------------
 
-function Onboarding() {
+const ONBOARDING_KEY = 'recall:onboarding';
+type OnboardingValues = { program: string; semester: string; start: string; end: string; course: string; section: string };
+type OnboardingState = {
+  step: number;
+  ids: { program?: string; semester?: string; course?: string; section?: string };
+  values: OnboardingValues;
+};
+
+function readOnboardingState(): OnboardingState | null {
+  try {
+    const raw = sessionStorage.getItem(ONBOARDING_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as OnboardingState;
+    return saved.step >= 1 && saved.step <= 3 && saved.ids && saved.values ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeOnboardingState(state: OnboardingState | null) {
+  try {
+    if (state) sessionStorage.setItem(ONBOARDING_KEY, JSON.stringify(state));
+    else sessionStorage.removeItem(ONBOARDING_KEY);
+  } catch {
+    // The wizard still works for this page load if session storage is unavailable.
+  }
+}
+
+function Onboarding({ onProgress, onDone }: { onProgress: () => void; onDone: () => void }) {
   const toast = useToast();
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
+  const [saved] = useState(readOnboardingState);
+  const [step, setStep] = useState(saved?.step ?? 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ids, setIds] = useState<{ program?: string; semester?: string; course?: string; section?: string }>({});
-  const [v, setV] = useState({ program: '', semester: '', start: '', end: '', course: '', section: '' });
+  const [ids, setIds] = useState<OnboardingState['ids']>(saved?.ids ?? {});
+  const [v, setV] = useState<OnboardingValues>(saved?.values ?? { program: '', semester: '', start: '', end: '', course: '', section: '' });
+
+  useEffect(() => {
+    if (step > 0) writeOnboardingState({ step, ids, values: v });
+  }, [step, ids, v]);
 
   const steps = [
     { icon: GraduationCap, label: 'Study program', hint: 'A degree or personal study collection.' },
@@ -339,7 +386,10 @@ function Onboarding() {
     try {
       if (step === 0) {
         const p = await api.post<Program>('/api/programs', { title: v.program });
-        setIds((x) => ({ ...x, program: p.id }));
+        const nextIds = { ...ids, program: p.id };
+        setIds(nextIds);
+        writeOnboardingState({ step: 1, ids: nextIds, values: v });
+        onProgress();
       } else if (step === 1) {
         const s = await api.post<Semester>('/api/semesters', { programId: ids.program, title: v.semester, startDate: v.start || null, endDate: v.end || null });
         setIds((x) => ({ ...x, semester: s.id }));
@@ -348,6 +398,8 @@ function Onboarding() {
         setIds((x) => ({ ...x, course: c.id }));
       } else if (step === 3) {
         const s = await api.post<Section>('/api/sections', { courseId: ids.course, title: v.section });
+        writeOnboardingState(null);
+        onDone();
         invalidateContent();
         navigate(`/cards/new?section=${s.id}&first=1`);
         return;
@@ -364,6 +416,8 @@ function Onboarding() {
     setBusy(true);
     try {
       const r = await api.post<{ courseId: string }>('/api/demo');
+      writeOnboardingState(null);
+      onDone();
       invalidateContent();
       toast.success('Demo course loaded');
       navigate(`/courses/${r.courseId}`);
@@ -442,6 +496,19 @@ function Onboarding() {
               <p className="text-sm text-muted">Just looking around? Load a small, clearly labelled demo course you can remove in one click.</p>
               <Button onClick={loadDemo} disabled={busy} icon={<FlaskConical className="size-4" />}>
                 Load demo course
+              </Button>
+            </div>
+          )}
+          {step > 0 && (
+            <div className="mt-6 flex items-center justify-end border-t border-border pt-5">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  writeOnboardingState(null);
+                  onDone();
+                }}
+              >
+                Skip the rest for now
               </Button>
             </div>
           )}

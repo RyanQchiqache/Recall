@@ -60,6 +60,11 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
+  const [seed] = useState(() => {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0];
+  });
 
   const semesters = tree.flatMap((p) => p.semesters.filter((s) => !s.archivedAt).map((s) => ({ ...s, programTitle: p.title })));
   const sem = semesters.find((s) => s.id === shownSemester) ?? null;
@@ -71,6 +76,7 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
     ordering,
     size: Math.max(1, size || 1),
     maxAttempts: mode === 'test' ? 1 : maxAttempts,
+    seed,
   };
   const debounced = useDebounced(request, 200);
   const hasScope = cardIds.length > 0 || !!wholeSemester || courseIds.size > 0 || sectionIds.size > 0;
@@ -323,6 +329,10 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
             <h2 className="text-lg font-semibold">Summary</h2>
             {!hasScope ? (
               <p className="mt-3 text-muted">Select a semester, courses or sections to see what’s available.</p>
+            ) : preview.error ? (
+              <Alert className="mt-4" tone="danger" action={<Button size="sm" onClick={() => preview.refetch()}>Retry</Button>}>
+                {errorMessage(preview.error)}
+              </Alert>
             ) : !pv ? (
               <div className="mt-4 flex items-center gap-2 text-muted">
                 <Spinner className="size-4" /> Checking cards…

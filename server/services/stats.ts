@@ -255,6 +255,7 @@ export function getDashboard(ctx: Ctx): DashboardData {
   }
   const hasContent = (ctx.db.prepare('SELECT COUNT(*) AS n FROM programs WHERE deleted_at IS NULL').get() as { n: number }).n > 0;
   const demoLoaded = (ctx.db.prepare('SELECT COUNT(*) AS n FROM programs WHERE is_demo = 1').get() as { n: number }).n > 0;
+  const studiedDates = ctx.db.prepare('SELECT rated_at FROM review_events WHERE undone_at IS NULL').all() as { rated_at: string }[];
   return {
     settings,
     today: day,
@@ -273,6 +274,7 @@ export function getDashboard(ctx: Ctx): DashboardData {
       counts: rc.get(r.id) ?? { total: 0, due: 0, new: 0, suspended: 0 },
     })),
     activity: [...act.entries()].map(([date, b]) => ({ date, attempts: b.attempts, uniqueCards: b.cards.size })),
+    streak: streaks(new Set(studiedDates.map((r) => localDateOf(r.rated_at, tz))), day),
     demoLoaded,
   };
 }

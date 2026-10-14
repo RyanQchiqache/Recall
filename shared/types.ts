@@ -304,6 +304,7 @@ export interface DashboardData {
   courses: (TreeCourse & { programTitle: string; semesterTitle: string })[];
   recentSections: { id: string; title: string; courseId: string; courseTitle: string; courseColor: string; lastActivityAt: string; counts: Counts }[];
   activity: { date: LocalDate; attempts: number; uniqueCards: number }[];
+  streak: { current: number; longest: number };
   demoLoaded: boolean;
 }
 
