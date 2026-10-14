@@ -1,14 +1,14 @@
 import { strToU8, unzipSync, zipSync } from 'fflate';
 import { afterEach, describe, expect, it } from 'vitest';
-import { makeApp, revealAndRate, seedHierarchy, sessionRequest, type TestApp } from './helpers.ts';
+import { makeApp, makeClock, revealAndRate, seedHierarchy, sessionRequest, type TestApp } from './helpers.ts';
 
 let apps: TestApp[] = [];
 afterEach(async () => {
   for (const a of apps) await a.close();
   apps = [];
 });
-async function app() {
-  const a = await makeApp();
+async function app(opts: Parameters<typeof makeApp>[0] = {}) {
+  const a = await makeApp(opts);
   apps.push(a);
   return a;
 }
@@ -184,5 +184,39 @@ describe('card ordering', () => {
       ids: [h.sections[1].cardIds[0]],
     });
     expect(result.status).toBe(400);
+  });
+});
+
+describe('exam planning', () => {
+  it('recalculates the daily plan, readiness and behind status from what remains', async () => {
+    const clock = makeClock('2026-10-13T08:00:00.000Z');
+    const a = await app({ clock });
+    const h = await seedHierarchy(a, [10]);
+    await a.api('PATCH', `/api/courses/${h.course.id}`, { examDate: '2026-10-20' });
+
+    let course = (await a.api('GET', '/api/dashboard')).body.courses.find((c: { id: string }) => c.id === h.course.id);
+    expect(course.examPlan).toMatchObject({ status: 'upcoming', daysToExam: 7, bufferDays: 3, learnToday: 3, reviseToday: 0, learnedPercent: 0, solidPercent: 0, behindBy: 0 });
+
+    clock.advance(24 * 60 * 60 * 1000);
+    course = (await a.api('GET', '/api/dashboard')).body.courses.find((c: { id: string }) => c.id === h.course.id);
+    expect(course.examPlan).toMatchObject({ daysToExam: 6, learnToday: 4, behindBy: 3 });
+
+    const session = (await a.api('POST', '/api/sessions', sessionRequest({ courseIds: [h.course.id] }, { size: 1 }))).body;
+    await revealAndRate(a, session.id, 3);
+    course = (await a.api('GET', '/api/dashboard')).body.courses.find((c: { id: string }) => c.id === h.course.id);
+    expect(course.examPlan).toMatchObject({ learnToday: 3, learnedPercent: 10, solidPercent: 10, behindBy: 2 });
+  });
+
+  it('marks a past exam and removes planning when the date is cleared', async () => {
+    const a = await app({ clock: makeClock('2026-10-21T08:00:00.000Z') });
+    const h = await seedHierarchy(a, [1]);
+    await a.api('PATCH', `/api/courses/${h.course.id}`, { examDate: '2026-10-20' });
+    let dashboard = (await a.api('GET', '/api/dashboard')).body;
+    expect(dashboard.courses.find((c: { id: string }) => c.id === h.course.id).examPlan.status).toBe('passed');
+
+    await a.api('PATCH', `/api/courses/${h.course.id}`, { examDate: null });
+    dashboard = (await a.api('GET', '/api/dashboard')).body;
+    expect(dashboard.courses.find((c: { id: string }) => c.id === h.course.id).examPlan).toBeNull();
+    expect((await a.api('GET', `/api/courses/${h.course.id}`)).body.item.examSetAt).toBeNull();
   });
 });

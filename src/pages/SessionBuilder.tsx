@@ -52,11 +52,19 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
   const [courseIds, setCourseIds] = useState<Set<string>>(initial.courses);
   const [sectionIds, setSectionIds] = useState<Set<string>>(initial.sections);
   const [mode, setMode] = useState<StudyMode>((params.get('mode') as StudyMode) || (cardIds.length ? 'practice' : 'scheduled'));
-  const [size, setSize] = useState<number>(cardIds.length || defaults.defaultSessionSize);
-  const [custom, setCustom] = useState(!SESSION_SIZE_PRESETS.includes((cardIds.length || defaults.defaultSessionSize) as never));
+  const requestedSize = Number(params.get('size'));
+  const initialSize = cardIds.length || (Number.isInteger(requestedSize) && requestedSize > 0 ? requestedSize : defaults.defaultSessionSize);
+  const [size, setSize] = useState<number>(initialSize);
+  const [custom, setCustom] = useState(!SESSION_SIZE_PRESETS.includes(initialSize as never));
   const [ordering, setOrdering] = useState<SessionOrdering>('default');
   const [maxAttempts, setMaxAttempts] = useState(defaults.defaultMaxAttempts);
-  const [filters, setFilters] = useState<SessionFilters>({ includeNew: defaults.includeNewByDefault, tags: [], bookmarkedOnly: false, status: 'any', weakBasis: 'all' });
+  const [filters, setFilters] = useState<SessionFilters>({
+    includeNew: params.has('includeNew') ? params.get('includeNew') === '1' : defaults.includeNewByDefault,
+    tags: [],
+    bookmarkedOnly: false,
+    status: 'any',
+    weakBasis: 'all',
+  });
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);

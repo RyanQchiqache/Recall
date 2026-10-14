@@ -33,6 +33,7 @@ export interface CourseRow extends ProgramRow {
   color: string;
   icon: string;
   exam_date: string | null;
+  exam_set_at: string | null;
 }
 export interface SectionRow extends Omit<ProgramRow, 'description'> {
   course_id: string;
@@ -106,6 +107,7 @@ export const toCourse = (r: CourseRow): Course => ({
   icon: r.icon,
   description: r.description,
   examDate: r.exam_date,
+  examSetAt: r.exam_set_at,
   position: r.position,
   ...life(r),
 });

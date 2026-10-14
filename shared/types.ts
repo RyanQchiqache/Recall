@@ -39,6 +39,7 @@ export interface Course extends Lifecycle {
   icon: string;
   description: string;
   examDate: LocalDate | null;
+  examSetAt: string | null;
   position: number;
 }
 
@@ -301,11 +302,22 @@ export interface DashboardData {
   currentSemester: (Semester & { programTitle: string }) | null;
   counts: { due: number; new: number; total: number };
   openSession: SessionSummary | null;
-  courses: (TreeCourse & { programTitle: string; semesterTitle: string })[];
+  courses: (TreeCourse & { programTitle: string; semesterTitle: string; examPlan: ExamPlan | null })[];
   recentSections: { id: string; title: string; courseId: string; courseTitle: string; courseColor: string; lastActivityAt: string; counts: Counts }[];
   activity: { date: LocalDate; attempts: number; uniqueCards: number }[];
   streak: { current: number; longest: number };
   demoLoaded: boolean;
+}
+
+export interface ExamPlan {
+  status: 'upcoming' | 'passed';
+  daysToExam: number;
+  bufferDays: number;
+  learnToday: number;
+  reviseToday: number;
+  learnedPercent: number;
+  solidPercent: number;
+  behindBy: number;
 }
 
 export interface StatsQuery {

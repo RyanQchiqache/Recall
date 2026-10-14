@@ -536,9 +536,9 @@ export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId:
   db.transaction(() => {
     const pos = (db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM courses WHERE semester_id = ?').get(opts.semesterId) as { p: number }).p;
     db.prepare(
-      `INSERT INTO courses (id, semester_id, title, module_code, color, icon, description, exam_date, position, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(courseId, opts.semesterId, String(course.title ?? 'Imported course'), String(course.module_code ?? ''), oneOf(COURSE_COLORS, course.color, 'indigo'), oneOf(COURSE_ICONS, course.icon, 'book-open'), String(course.description ?? ''), dateOrNull(course.exam_date), pos, ts, ts);
+      `INSERT INTO courses (id, semester_id, title, module_code, color, icon, description, exam_date, exam_set_at, position, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(courseId, opts.semesterId, String(course.title ?? 'Imported course'), String(course.module_code ?? ''), oneOf(COURSE_COLORS, course.color, 'indigo'), oneOf(COURSE_ICONS, course.icon, 'book-open'), String(course.description ?? ''), dateOrNull(course.exam_date), dateOrNull(course.exam_date) ? ts : null, pos, ts, ts);
     for (const s of data.tables.sections ?? []) {
       const id = newId(t);
       sectionMap.set(String(s.id), id);

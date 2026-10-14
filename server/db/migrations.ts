@@ -249,6 +249,14 @@ FROM cards c
 JOIN section_ctx sc ON sc.id = c.section_id;
 `,
   },
+  {
+    version: 2,
+    name: 'exam planning anchor',
+    sql: `
+ALTER TABLE courses ADD COLUMN exam_set_at TEXT;
+UPDATE courses SET exam_set_at = updated_at WHERE exam_date IS NOT NULL;
+`,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -263,6 +263,9 @@ export function createItem(ctx: Ctx, level: Level, input: Record<string, unknown
   ctx.db
     .prepare(`INSERT INTO ${def.table} (${cols.join(',')}) VALUES (${placeholders(cols.length)})`)
     .run(...vals);
+  if (level === 'course' && fields.examDate) {
+    ctx.db.prepare('UPDATE courses SET exam_set_at = ? WHERE id = ?').run(ts, id);
+  }
   return getItem(ctx, level, id);
 }
 
@@ -295,6 +298,10 @@ export function updateItem(ctx: Ctx, level: Level, id: string, input: Record<str
     if (v === undefined) continue;
     sets.push(`${COLUMN_MAP[k]} = ?`);
     vals.push(v);
+  }
+  if (level === 'course' && fields.examDate !== undefined && fields.examDate !== existing.exam_date) {
+    sets.push('exam_set_at = ?');
+    vals.push(fields.examDate ? nowIso(ctx) : null);
   }
   if (typeof input.archived === 'boolean') {
     sets.push('archived_at = ?');

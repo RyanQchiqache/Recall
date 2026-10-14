@@ -182,6 +182,11 @@ function DashboardContent({ d }: { d: DashboardData }) {
         >
           Courses
         </SectionTitle>
+        {d.courses.some((course) => course.examPlan) && (
+          <p className="-mt-2 mb-4 text-[13px] text-muted">
+            “Answering well” means the latest scheduled-review rating was Very good or Perfect.
+          </p>
+        )}
         {d.courses.length === 0 ? (
           <EmptyState
             icon={<BookOpen className="size-6" />}
@@ -198,7 +203,30 @@ function DashboardContent({ d }: { d: DashboardData }) {
           <ul className="grid gap-3 md:grid-cols-2">
             {d.courses.map((c) => (
               <li key={c.id}>
-                <CourseCard course={c} today={d.today} onStudy={() => navigate(`/study/new${qs({ course: c.id })}`)} />
+                <CourseCard
+                  course={c}
+                  today={d.today}
+                  onStudy={() => navigate(`/study/new${qs({ course: c.id })}`)}
+                  onPlanStudy={() =>
+                    navigate(
+                      `/study/new${qs({
+                        course: c.id,
+                        mode: 'scheduled',
+                        size: (c.examPlan?.learnToday ?? 0) + (c.examPlan?.reviseToday ?? 0),
+                        includeNew: true,
+                      })}`,
+                    )
+                  }
+                  onClearExam={async () => {
+                    try {
+                      await api.patch(`/api/courses/${c.id}`, { examDate: null });
+                      invalidateContent();
+                      toast.success('Exam date cleared');
+                    } catch (err) {
+                      toast.error(errorMessage(err));
+                    }
+                  }}
+                />
               </li>
             ))}
           </ul>
@@ -267,7 +295,19 @@ function ActivityBars({ activity }: { activity: DashboardData['activity'] }) {
   );
 }
 
-function CourseCard({ course: c, today, onStudy }: { course: DashboardData['courses'][number]; today: string; onStudy: () => void }) {
+function CourseCard({
+  course: c,
+  today,
+  onStudy,
+  onPlanStudy,
+  onClearExam,
+}: {
+  course: DashboardData['courses'][number];
+  today: string;
+  onStudy: () => void;
+  onPlanStudy: () => void;
+  onClearExam: () => void;
+}) {
   const daysToExam = c.examDate ? diffDays(today, c.examDate) : null;
   const n = c.counts;
   const active = Math.max(0, n.total - n.suspended);
@@ -310,14 +350,56 @@ function CourseCard({ course: c, today, onStudy }: { course: DashboardData['cour
       <div
         className="mt-4 flex h-1.5 w-full gap-[2px] overflow-hidden rounded-full bg-surface-3"
         role="img"
-        aria-label={`${pct}% on track, ${n.due} due, ${n.new} new`}
+        aria-label={`${pct}% scheduled ahead, ${n.due} due, ${n.new} new`}
       >
         {onTrack > 0 && <span className="h-full rounded-full bg-primary" style={{ width: `${(onTrack / Math.max(1, active)) * 100}%` }} />}
         {n.due > 0 && <span className="h-full rounded-full bg-[color-mix(in_srgb,var(--primary)_38%,var(--surface-3))]" style={{ width: `${(n.due / Math.max(1, active)) * 100}%` }} />}
       </div>
+      {c.examPlan?.status === 'upcoming' && (
+        <div className="relative z-10 mt-4 rounded-lg border border-border bg-surface-2/60 p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-medium text-muted">Learn today</p>
+              <p className="mt-0.5 text-xl font-semibold tabular-nums">{c.examPlan.learnToday}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Revise today</p>
+              <p className="mt-0.5 text-xl font-semibold tabular-nums">{c.examPlan.reviseToday}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-[13px]">
+            <span className="text-text-2 tabular-nums">
+              {c.examPlan.learnedPercent}% learned · {c.examPlan.solidPercent}% answering well
+            </span>
+            <span className={cn('font-medium', c.examPlan.behindBy > 0 ? 'text-warning' : 'text-success')}>
+              {c.examPlan.behindBy > 0 ? `Behind by ${plural(c.examPlan.behindBy, 'card')}` : 'On track'}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted">
+              {c.examPlan.bufferDays > 0 ? `${plural(c.examPlan.bufferDays, 'review-only day')} before the exam` : 'Plan recalculates each day'}
+            </p>
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Play className="size-3 fill-current" />}
+              onClick={onPlanStudy}
+              disabled={c.examPlan.learnToday + c.examPlan.reviseToday === 0}
+            >
+              Study plan
+            </Button>
+          </div>
+        </div>
+      )}
+      {c.examPlan?.status === 'passed' && (
+        <div className="relative z-10 mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/60 px-3 py-2.5">
+          <span className="text-sm font-medium">Exam passed</span>
+          <Button size="sm" variant="ghost" onClick={onClearExam}>Clear date</Button>
+        </div>
+      )}
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="truncate text-[13px] text-muted">
-          {active === 0 ? 'No cards yet' : onTrack === 0 && n.due === 0 ? `${plural(n.new, 'card')} to learn` : n.due === 0 ? `${pct}% on track · all caught up` : `${pct}% on track`}
+          {active === 0 ? 'No cards yet' : onTrack === 0 && n.due === 0 ? `${plural(n.new, 'card')} to learn` : n.due === 0 ? `${pct}% scheduled ahead · all caught up` : `${pct}% scheduled ahead`}
         </p>
         <Button size="sm" className="relative z-10" variant={n.due > 0 ? 'primary' : 'secondary'} icon={<Play className="size-3 fill-current" />} onClick={onStudy} disabled={n.total === 0}>
           Study

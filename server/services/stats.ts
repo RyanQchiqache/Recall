@@ -1,6 +1,6 @@
 import { addDays, dateRange, diffDays, isLocalDate, localDateOf, startOfLocalDay } from '../../shared/dates.ts';
 import type { Rating, StudyMode } from '../../shared/ratings.ts';
-import type { DashboardData, ModeStats, StatsData, StatsQuery } from '../../shared/types.ts';
+import type { DashboardData, ExamPlan, ModeStats, StatsData, StatsQuery, TreeCourse } from '../../shared/types.ts';
 import type { Ctx } from '../context.ts';
 import { badRequest } from '../lib/util.ts';
 import { getTree, resolveCurrentSemester, sectionCounts } from './hierarchy.ts';
@@ -206,13 +206,63 @@ function scopeLabelFor(ctx: Ctx, q: StatsQuery): string {
   return 'All programs';
 }
 
+function examPlanFor(ctx: Ctx, course: TreeCourse, day: string, timeZone: string): ExamPlan | null {
+  if (!course.examDate) return null;
+  const daysToExam = diffDays(day, course.examDate);
+  const active = Math.max(0, course.counts.total - course.counts.suspended);
+  const readiness = ctx.db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN cs.card_id IS NOT NULL OR EXISTS (
+           SELECT 1 FROM review_events re WHERE re.card_id = c.id AND re.undone_at IS NULL
+         ) THEN 1 ELSE 0 END) AS learned,
+         SUM(CASE WHEN cs.last_rating >= 3 THEN 1 ELSE 0 END) AS solid
+       FROM card_ctx c LEFT JOIN card_schedules cs ON cs.card_id = c.id
+       WHERE c.course_id = ? AND c.in_trash = 0 AND c.in_archive = 0 AND c.suspended_at IS NULL`,
+    )
+    .get(course.id) as { learned: number | null; solid: number | null };
+  const learned = readiness.learned ?? 0;
+  const solid = readiness.solid ?? 0;
+  if (daysToExam < 0) {
+    return {
+      status: 'passed',
+      daysToExam,
+      bufferDays: 0,
+      learnToday: 0,
+      reviseToday: 0,
+      learnedPercent: active ? Math.round((learned / active) * 100) : 0,
+      solidPercent: active ? Math.round((solid / active) * 100) : 0,
+      behindBy: 0,
+    };
+  }
+
+  const bufferDays = Math.min(3, Math.max(0, daysToExam - 1));
+  const learningDaysLeft = Math.max(1, daysToExam - bufferDays);
+  const planStart = course.examSetAt ? localDateOf(course.examSetAt, timeZone) : day;
+  const totalDays = Math.max(1, diffDays(planStart, course.examDate));
+  const totalBuffer = Math.min(3, Math.max(0, totalDays - 1));
+  const totalLearningDays = Math.max(1, totalDays - totalBuffer);
+  const elapsedLearningDays = Math.min(totalLearningDays, Math.max(0, diffDays(planStart, day)));
+  const expectedLearned = Math.ceil((active * elapsedLearningDays) / totalLearningDays);
+  return {
+    status: 'upcoming',
+    daysToExam,
+    bufferDays,
+    learnToday: course.counts.new > 0 ? Math.ceil(course.counts.new / learningDaysLeft) : 0,
+    reviseToday: course.counts.due,
+    learnedPercent: active ? Math.round((learned / active) * 100) : 0,
+    solidPercent: active ? Math.round((solid / active) * 100) : 0,
+    behindBy: Math.max(0, expectedLearned - learned),
+  };
+}
+
 export function getDashboard(ctx: Ctx): DashboardData {
   const settings = getSettings(ctx);
   const tz = settings.timeZone;
   const day = today(ctx);
   const tree = getTree(ctx);
   const sem = resolveCurrentSemester(ctx);
-  const courses: DashboardData['courses'] = [];
+  const courses: (TreeCourse & { programTitle: string; semesterTitle: string })[] = [];
   for (const p of tree) {
     for (const s of p.semesters) {
       if (sem && s.id !== sem.id) continue;
@@ -263,7 +313,7 @@ export function getDashboard(ctx: Ctx): DashboardData {
     currentSemester: sem ? { ...toSemester(sem), programTitle: sem.program_title } : null,
     counts,
     openSession: getOpenSession(ctx),
-    courses,
+    courses: courses.map((course) => ({ ...course, examPlan: examPlanFor(ctx, course, day, tz) })),
     recentSections: recent.map((r) => ({
       id: r.id,
       title: r.title,
