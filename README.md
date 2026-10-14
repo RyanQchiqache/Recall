@@ -7,6 +7,7 @@ You organize **study programs → semesters → courses → sections → cards**
 - **No AI, no cloud, no account, no telemetry.** Nothing is ever sent anywhere.
 - **Works offline.** After the one-time install and build, the app needs no internet connection.
 - **Your data is a single SQLite database** in a folder you control, plus your uploaded images.
+- **Plans toward your exams.** Set an exam date on a course to get a daily learn-and-revise plan plus plain-language readiness on the dashboard.
 
 ![Dashboard](docs/screenshots/03-dashboard.png)
 
@@ -134,6 +135,19 @@ This is a deliberately simple, transparent rule of this app. It is **not** FSRS,
 
 Intervals are capped at 365 days. All values are adjustable in Settings, and changes only apply to future reviews. Each session stores a snapshot of the settings it was started with. Due dates are calendar dates in your configured timezone (default `Europe/Berlin`). A card becomes due at local midnight, and daylight-saving changes never shift a due date.
 
+For a course with an upcoming exam, the next due date is capped at the day before the exam so no scheduled review lands after it. Courses without an exam date keep the normal intervals above.
+
+### Exam planning
+
+Add or clear an exam date in the course settings. The dashboard then recalculates the course plan every day from the cards that remain:
+
+- **Learn today** spreads new cards across the available days, normally keeping the final three days before the exam for review only (or fewer when the exam is close).
+- **Revise today** is the number of cards currently due. **Study plan** opens the normal session builder prefilled with exactly the due cards and today’s new-card allowance.
+- **Learned** means a card has been studied at least once. **Answering well** means its latest scheduled-review rating was Very good or Perfect. These are personal confidence signals, not predicted exam scores.
+- **On track / Behind by N cards** compares cards learned so far with the even pace from when the exam date was set. If a day is skipped, tomorrow’s plan automatically spreads what remains over fewer days.
+
+After the date passes, the dashboard says **Exam passed** and offers to clear the date.
+
 ### Keyboard shortcuts
 
 | Where | Keys |
@@ -230,7 +244,7 @@ scripts/    screenshots.ts (Playwright walkthrough)
 ## Known limitations
 
 - Single user, single computer. There is no sync or mobile app, by design: a loopback-only server can't safely provide those.
-- Cards are question/answer only. A reversible front/back option, cloze, multiple choice, image occlusion and exam planning are possible later additions and would each get their own scheduling state.
+- Cards are question/answer only. A reversible front/back option, cloze, multiple choice and image occlusion are possible later additions and would each get their own scheduling state.
 - Media files are not deleted when you delete the cards that use them, to keep older snapshots restorable. They are small and stay in `media/`.
 - Automatic snapshots contain the database only. Images stay in `media/`, and a full exported backup includes both.
 
