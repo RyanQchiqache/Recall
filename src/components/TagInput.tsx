@@ -4,8 +4,23 @@ import { useTags } from '../lib/queries.ts';
 import { cn } from '../lib/util.ts';
 import { fieldClass } from './ui/Form.tsx';
 
-export function TagInput({ id, value, onChange }: { id: string; value: string[]; onChange: (tags: string[]) => void }) {
-  const [draft, setDraft] = useState('');
+export function TagInput({
+  id,
+  value,
+  onChange,
+  pendingRef,
+}: {
+  id: string;
+  value: string[];
+  onChange: (tags: string[]) => void;
+  /** Receives text typed but not yet turned into a tag, so a keyboard save can include it. */
+  pendingRef?: React.MutableRefObject<string>;
+}) {
+  const [draft, setDraftState] = useState('');
+  const setDraft = (v: string) => {
+    setDraftState(v);
+    if (pendingRef) pendingRef.current = v;
+  };
   const tags = useTags();
   const listId = useId();
   const add = (raw: string) => {
@@ -31,9 +46,10 @@ export function TagInput({ id, value, onChange }: { id: string; value: string[];
         value={draft}
         onChange={(e) => (e.target.value.endsWith(',') ? add(e.target.value) : setDraft(e.target.value))}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && draft.trim()) {
+          if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+            // Enter only ever adds a tag here; it must not submit the whole card form.
             e.preventDefault();
-            add(draft);
+            if (draft.trim()) add(draft);
           } else if (e.key === 'Backspace' && !draft && value.length) {
             onChange(value.slice(0, -1));
           }

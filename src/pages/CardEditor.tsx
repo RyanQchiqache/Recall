@@ -17,7 +17,7 @@ import { useToast } from '../components/ui/Toast.tsx';
 import { ApiError, api, errorMessage } from '../lib/api.ts';
 import { formatDate, formatDateTime, plural } from '../lib/format.ts';
 import { invalidateContent, queryClient, useCard, useDashboard } from '../lib/queries.ts';
-import { cn } from '../lib/util.ts';
+import { cn, dialogOpen } from '../lib/util.ts';
 
 interface Form {
   sectionId: string;
@@ -67,8 +67,17 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   const [detailsOpen, setDetailsOpen] = useState(() => !!(card && (card.explanation || card.hint || card.source || card.tags.length)));
   const [conflict, setConflict] = useState<Card | null>(null);
   const frontRef = useRef<MarkdownEditorHandle>(null);
-  const draftKey = card ? `card:${card.id}` : form.sectionId ? `new:${form.sectionId}` : null;
-  const [draftKeyAtLoad] = useState(draftKey);
+  // One draft key per editor session: switching the section of a new card must not orphan the draft.
+  const liveKey = card ? `card:${card.id}` : form.sectionId ? `new:${form.sectionId}` : null;
+  const [draftKeyAtLoad] = useState(liveKey);
+  const [stableKey, setStableKey] = useState(liveKey);
+  useEffect(() => {
+    if (!stableKey && liveKey) setStableKey(liveKey);
+  }, [stableKey, liveKey]);
+  const draftKey = stableKey ?? liveKey;
+  const tagPending = useRef('');
+  const pendingDraft = useRef<{ key: string; body: unknown } | null>(null);
+  const [staleDraft, setStaleDraft] = useState(false);
   const dirty = !same(form, baseline.current);
   const justSaved = useRef(false);
 
@@ -86,11 +95,16 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
       .get<{ payload: Partial<Form> & { baseRevision?: number }; updatedAt: string } | null>(`/api/drafts/${draftKeyAtLoad}`)
       .then((d) => {
         if (cancelled || !d?.payload) return;
-        const { baseRevision: _b, ...rest } = d.payload;
+        const { baseRevision, ...rest } = d.payload;
         const merged: Form = { ...baseline.current, ...rest, tags: Array.isArray(rest.tags) ? rest.tags : baseline.current.tags };
         if (!same(merged, baseline.current)) {
           setForm(merged);
           setRestored(d.updatedAt);
+          if (card && typeof baseRevision === 'number' && baseRevision !== card.revision) {
+            // The card changed after this draft was written: saving will ask which version to keep.
+            setRevision(baseRevision);
+            setStaleDraft(true);
+          }
           if (merged.explanation || merged.hint || merged.source || merged.tags.length) setDetailsOpen(true);
         }
       })
@@ -104,9 +118,12 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   useEffect(() => {
     if (!draftKey || !dirty || justSaved.current) return;
     setDraftState('saving');
+    const body = { ...form, baseRevision: revision };
+    pendingDraft.current = { key: draftKey, body };
     const t = setTimeout(async () => {
       try {
-        await api.put(`/api/drafts/${draftKey}`, { ...form, baseRevision: revision });
+        await api.put(`/api/drafts/${draftKey}`, body);
+        if (pendingDraft.current?.body === body) pendingDraft.current = null;
         setDraftState('saved');
       } catch {
         setDraftState('error');
@@ -114,6 +131,26 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
     }, 600);
     return () => clearTimeout(t);
   }, [form, draftKey, dirty, revision]);
+
+  // Flush a draft that is still waiting for its debounce when leaving the editor or closing the tab.
+  useEffect(() => {
+    const flush = () => {
+      const p = pendingDraft.current;
+      if (!p || justSaved.current) return;
+      pendingDraft.current = null;
+      void fetch(`/api/drafts/${p.key}`, {
+        method: 'PUT',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'X-Recall-Client': '1' },
+        body: JSON.stringify(p.body),
+      }).catch(() => undefined);
+    };
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, []);
 
   // Warn before leaving with unsaved edits only if the draft could not be stored.
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && draftState === 'error' && currentLocation.pathname !== nextLocation.pathname);
@@ -133,7 +170,9 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
     if (saving || !validate()) return;
     setSaving(true);
     try {
-      const body = { ...form, source: form.source.trim() };
+      const pendingTags = tagPending.current.split(',').map((t) => t.trim()).filter(Boolean);
+      const tags = [...form.tags, ...pendingTags.filter((t) => !form.tags.some((x) => x.toLowerCase() === t.toLowerCase()))];
+      const body = { ...form, tags, source: form.source.trim() };
       let saved: Card;
       if (isNew) {
         saved = await api.post<Card>('/api/cards', body);
@@ -141,7 +180,8 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
         saved = await api.patch<Card>(`/api/cards/${card!.id}`, { ...body, revision: overwrite ? undefined : revision });
       }
       justSaved.current = true;
-      if (draftKey) await api.del(`/api/drafts/${draftKey}`).catch(() => undefined);
+      pendingDraft.current = null;
+      for (const k of new Set([draftKey, liveKey])) if (k) await api.del(`/api/drafts/${k}`).catch(() => undefined);
       invalidateContent();
       queryClient.setQueryData(['card', saved.id], (old: { card: Card; breadcrumbs: Crumb[] } | undefined) => (old ? { ...old, card: saved } : old));
       toast.success(isNew ? 'Card created' : 'Card saved');
@@ -150,6 +190,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
         baseline.current = next;
         setForm(next);
         setRestored(null);
+        setStaleDraft(false);
         setDraftState('idle');
         justSaved.current = false;
         requestAnimationFrame(() => frontRef.current?.focus());
@@ -169,7 +210,10 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   };
 
   const discardDraft = async () => {
+    pendingDraft.current = null;
     if (draftKey) await api.del(`/api/drafts/${draftKey}`).catch(() => undefined);
+    if (card) setRevision(card.revision);
+    setStaleDraft(false);
     setForm(baseline.current);
     setRestored(null);
     setDraftState('idle');
@@ -178,6 +222,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   // Keyboard: Cmd/Ctrl+Enter saves, +Shift saves and starts the next card.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (dialogOpen()) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         void save(isNew && e.shiftKey);
@@ -268,8 +313,9 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
         </Alert>
       )}
       {restored && (
-        <Alert tone="info" className="mb-5" action={<Button size="sm" variant="ghost" onClick={discardDraft}>Discard draft</Button>}>
+        <Alert tone={staleDraft ? 'warning' : 'info'} className="mb-5" action={<Button size="sm" variant="ghost" onClick={discardDraft}>Discard draft</Button>}>
           Restored unsaved changes from {formatDateTime(restored)}.
+          {staleDraft && ' The card was changed elsewhere since then — when you save, you can choose which version to keep.'}
         </Alert>
       )}
       {errors.general && (
@@ -327,7 +373,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
                   <Input id="card-hint" value={form.hint} onChange={(e) => set('hint', e.target.value)} maxLength={10000} />
                 </Field>
                 <Field label="Tags" optional htmlFor="card-tags">
-                  <TagInput id="card-tags" value={form.tags} onChange={(t) => set('tags', t)} />
+                  <TagInput id="card-tags" value={form.tags} onChange={(t) => set('tags', t)} pendingRef={tagPending} />
                 </Field>
                 <Field label="Source" optional htmlFor="card-source" hint="Free text, e.g. “Lecture 3, slide 24”.">
                   <Input id="card-source" value={form.source} onChange={(e) => set('source', e.target.value)} maxLength={500} />
@@ -398,6 +444,10 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
                   setForm(f);
                   setRevision(conflict.revision);
                   setConflict(null);
+                  setRestored(null);
+                  setStaleDraft(false);
+                  pendingDraft.current = null;
+                  if (draftKey) void api.del(`/api/drafts/${draftKey}`).catch(() => undefined);
                 }}
               >
                 Load their version
