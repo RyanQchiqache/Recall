@@ -57,6 +57,10 @@ Example: `npm start -- --port 5000 --data-dir ~/Documents/RecallData`
 
 The database starts empty. The dashboard walks you through creating a program, semester, course and first section, and then opens the card editor. To look around first, choose **Load demo course**: a small Computer Vision course (equations, code, an image and a long answer) that is clearly labelled as demo material. You can remove it in one step from the dashboard or from Settings → Demo content.
 
+### Built-in help
+
+Open **How to** from the navigation for a fully offline, searchable guide to Recall. Its question-and-answer topics explain library setup, card creation, session modes and options, the four ratings, exam planning, statistics, organization, settings, backups and keyboard shortcuts. Answers link directly to the relevant screen where useful; no help content is fetched from the internet.
+
 ---
 
 ## Where your data lives

@@ -173,6 +173,10 @@ async function main() {
   await shot(page, '15-backups');
   await page.goto(`${BASE}/trash`);
   await shot(page, '16-trash');
+  await page.goto(`${BASE}/help#study-modes`);
+  await page.getByRole('heading', { name: 'How to use Recall' }).waitFor();
+  await page.locator('#study-modes').scrollIntoViewIfNeeded();
+  await shot(page, '19-help');
 
   // Dark mode.
   await api('PATCH', '/api/settings', { theme: 'dark' });
@@ -220,6 +224,9 @@ async function main() {
   await shot(mp, '26-mobile-editor');
   await mp.goto(`${BASE}/stats`);
   await shot(mp, '27-mobile-stats');
+  await mp.goto(`${BASE}/help`);
+  await mp.getByRole('heading', { name: 'How to use Recall' }).waitFor();
+  await shot(mp, '28-mobile-help');
 
   await browser.close();
   console.log(`\nScreenshots: ${OUT}`);

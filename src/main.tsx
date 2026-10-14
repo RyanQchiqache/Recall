@@ -18,6 +18,7 @@ import { applyTheme, cachedPreference, rememberPreference } from './lib/theme.ts
 import { CardEditor } from './pages/CardEditor.tsx';
 import { CoursePage } from './pages/CoursePage.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
+import { HelpPage } from './pages/HelpPage.tsx';
 import { Organizer } from './pages/Organizer.tsx';
 import { SearchPage } from './pages/SearchPage.tsx';
 import { SectionPage } from './pages/SectionPage.tsx';
@@ -110,6 +111,7 @@ const router = createBrowserRouter([
           { path: '/search', element: <SearchPage /> },
           { path: '/stats', element: <StatsPage /> },
           { path: '/settings', element: <SettingsPage /> },
+          { path: '/help', element: <HelpPage /> },
           { path: '/trash', element: <TrashPage /> },
           { path: '*', element: <NotFound /> },
         ],

@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, FolderTree, LayoutDashboard, Moon, Play, Plus, Search, Settings, Sun, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronRight, CircleHelp, FolderTree, LayoutDashboard, Moon, Play, Plus, Search, Settings, Sun, Trash2 } from 'lucide-react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import type { TreeProgram } from '../../../shared/types.ts';
 import { useOpenSession, useSettings, useTree } from '../../lib/queries.ts';
@@ -15,6 +15,7 @@ const NAV = [
   { to: '/organize', label: 'Organize', icon: FolderTree },
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/help', label: 'How to', icon: CircleHelp },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
