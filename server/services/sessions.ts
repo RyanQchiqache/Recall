@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addDays, localDateOf } from '../../shared/dates.ts';
 import { createQueue, progressOf, rate as queueRate, relax as queueRelax, selectNext, clampMaxAttempts, type QueueEntry, type QueueState } from '../../shared/queue.ts';
 import { seededShuffle } from '../../shared/random.ts';
 import { isRating, isWeakRating, type Rating, type StudyMode } from '../../shared/ratings.ts';
@@ -729,12 +730,18 @@ export function rateCard(ctx: Ctx, id: string, input: unknown): RateResponse {
     const before = scheduleRowToState(beforeRow);
     if (affectsSchedule) {
       const scheduler = getScheduler(snap.schedulerVersion ?? s.scheduler_version);
+      const reviewedAt = ctx.now();
+      const timeZone = snap.timeZone ?? getSettings(ctx).timeZone;
+      const exam = db.prepare('SELECT exam_date FROM courses WHERE id = ?').get(cardRow.course_id) as { exam_date: string | null } | undefined;
+      const reviewDay = localDateOf(reviewedAt, timeZone);
+      const maxDueDate = exam?.exam_date && exam.exam_date > reviewDay ? addDays(exam.exam_date, -1) : undefined;
       scheduleAfter = scheduler.next({
         previous: before,
         rating,
-        reviewedAt: ctx.now(),
-        timeZone: snap.timeZone ?? getSettings(ctx).timeZone,
+        reviewedAt,
+        timeZone,
         settings: normalizeSchedulerSettings(snap.scheduler),
+        maxDueDate,
       });
       writeSchedule(ctx, cardRow.card_id, scheduleAfter);
     }

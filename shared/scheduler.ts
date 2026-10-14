@@ -53,6 +53,8 @@ export interface ScheduleInput {
   reviewedAt: Date;
   timeZone: string;
   settings: SchedulerSettings;
+  /** Optional final due date, used to keep a review before an upcoming exam. */
+  maxDueDate?: LocalDate;
 }
 
 export interface Scheduler {
@@ -98,12 +100,13 @@ export function nextIntervalDays(
 
 export const heuristicV1: Scheduler = {
   version: HEURISTIC_V1,
-  next({ previous, rating, reviewedAt, timeZone, settings }: ScheduleInput): ScheduleState {
+  next({ previous, rating, reviewedAt, timeZone, settings, maxDueDate }: ScheduleInput): ScheduleState {
     const interval = nextIntervalDays(previous ? previous.intervalDays : null, rating, settings);
     const reviewDay = localDateOf(reviewedAt, timeZone);
+    const normalDueDate = addDays(reviewDay, interval);
     const iso = reviewedAt.toISOString();
     return {
-      dueDate: addDays(reviewDay, interval),
+      dueDate: maxDueDate && normalDueDate > maxDueDate ? maxDueDate : normalDueDate,
       intervalDays: interval,
       reviewCount: (previous?.reviewCount ?? 0) + 1,
       // A lapse is Bad on a previously reviewed card. Called once per scheduled session.

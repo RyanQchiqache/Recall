@@ -109,6 +109,20 @@ describe('session selection', () => {
 });
 
 describe('scheduling through sessions', () => {
+  it('caps reviews before an upcoming course exam and leaves other courses unchanged', async () => {
+    const a = await app();
+    const withExam = await seedHierarchy(a, [1]);
+    await a.api('PATCH', `/api/courses/${withExam.course.id}`, { examDate: '2026-10-18' });
+    const examSession = (await a.api('POST', '/api/sessions', sessionRequest({ courseIds: [withExam.course.id] }, { size: 1 }))).body;
+    const examRating = await revealAndRate(a, examSession.id, 4);
+    expect((await a.api('GET', `/api/cards/${examRating.cardId}`)).body.card.schedule.dueDate).toBe('2026-10-17');
+
+    const withoutExam = await seedHierarchy(a, [1]);
+    const normalSession = (await a.api('POST', '/api/sessions', sessionRequest({ courseIds: [withoutExam.course.id] }, { size: 1 }))).body;
+    const normalRating = await revealAndRate(a, normalSession.id, 4);
+    expect((await a.api('GET', `/api/cards/${normalRating.cardId}`)).body.card.schedule.dueDate).toBe('2026-10-20');
+  });
+
   it('new card rated Bad then Perfect stays due in one day; first Bad, final Perfect', async () => {
     const a = await app();
     const h = await seedHierarchy(a, [1]);

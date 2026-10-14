@@ -66,6 +66,17 @@ describe('recall-heuristic-v1 intervals', () => {
     expect(heuristicV1.next({ previous: null, rating: 4, reviewedAt: atFall, timeZone: TZ, settings: S }).dueDate).toBe('2026-10-31');
   });
 
+  it('caps a review at the day before an exam', () => {
+    const at = new Date('2026-10-13T08:00:00Z');
+    const capped = heuristicV1.next({ previous: reviewed(10), rating: 4, reviewedAt: at, timeZone: TZ, settings: S, maxDueDate: '2026-10-19' });
+    expect(capped).toMatchObject({ dueDate: '2026-10-19', intervalDays: 30 });
+  });
+
+  it('keeps the normal interval when there is no exam cap', () => {
+    const at = new Date('2026-10-13T08:00:00Z');
+    expect(heuristicV1.next({ previous: reviewed(10), rating: 4, reviewedAt: at, timeZone: TZ, settings: S }).dueDate).toBe('2026-11-12');
+  });
+
   it('normalizes invalid settings back to defaults', () => {
     const n = normalizeSchedulerSettings({ good: { base: -3, multiplier: 99 }, maxIntervalDays: 'x' });
     expect(n.good).toEqual(S.good);
