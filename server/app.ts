@@ -152,7 +152,6 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
     await app.register(fastifyStatic, {
       root: config.distDir,
       prefix: '/',
-      wildcard: false,
       index: ['index.html'],
       setHeaders: (reply, filePath) => {
         if (filePath.includes(`${path.sep}assets${path.sep}`)) reply.header('Cache-Control', 'public, max-age=31536000, immutable');

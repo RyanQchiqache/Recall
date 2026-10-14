@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { buildApp } from '../server/app.ts';
 import { Canvas } from '../server/lib/png.ts';
-import { HOST, key, makeApp, makeClock, sessionRequest, type TestApp } from './helpers.ts';
+import { HOST, key, makeApp, makeClock, sessionRequest, tempDir, testConfig, type TestApp } from './helpers.ts';
 
 let apps: TestApp[] = [];
 afterEach(async () => {
@@ -9,6 +12,25 @@ afterEach(async () => {
 });
 
 describe('create card → study → reload / restart', () => {
+  it('serves frontend assets added by a rebuild while the server is running', async () => {
+    const dataDir = tempDir();
+    const distDir = path.join(dataDir, 'dist');
+    fs.mkdirSync(path.join(distDir, 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(distDir, 'index.html'), '<div id="root"></div>');
+    const config = { ...testConfig(dataDir), distDir };
+    const built = await buildApp({ config, log: () => {} });
+    try {
+      fs.writeFileSync(path.join(distDir, 'assets', 'rebuilt.js'), 'window.rebuilt = true;');
+      const asset = await built.app.inject({ method: 'GET', url: '/assets/rebuilt.js', headers: { host: HOST } });
+
+      expect(asset.statusCode).toBe(200);
+      expect(asset.headers['content-type']).toContain('javascript');
+      expect(asset.body).toBe('window.rebuilt = true;');
+    } finally {
+      await built.close();
+    }
+  });
+
   it('runs the essential flow end to end and persists everything', async () => {
     const clock = makeClock('2026-10-13T08:00:00.000Z');
     const a = await makeApp({ clock });
