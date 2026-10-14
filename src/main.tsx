@@ -3,9 +3,9 @@ import '@fontsource-variable/jetbrains-mono';
 import 'katex/dist/katex.min.css';
 import './index.css';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, useEffect } from 'react';
+import { StrictMode, useEffect, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, Outlet, useRouteError } from 'react-router';
+import { createBrowserRouter, Outlet, useParams, useRouteError } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { HierarchyDialogs } from './components/HierarchyDialogs.tsx';
 import { AppShell } from './components/layout/AppShell.tsx';
@@ -43,6 +43,12 @@ function ThemeSync() {
     return () => mq.removeEventListener('change', onChange);
   }, [pref]);
   return null;
+}
+
+/** Remount a page when its :id changes, so selections, filters and searches never leak between items. */
+function KeyedById({ page: Page }: { page: ComponentType }) {
+  const { id } = useParams();
+  return <Page key={id} />;
 }
 
 function Root() {
@@ -88,19 +94,19 @@ const router = createBrowserRouter([
     element: <Root />,
     errorElement: <RouteError />,
     children: [
-      { path: '/study/:id', element: <StudyScreen /> },
+      { path: '/study/:id', element: <KeyedById page={StudyScreen} /> },
       {
         element: <AppShell />,
         errorElement: <RouteError />,
         children: [
           { path: '/', element: <Dashboard /> },
           { path: '/organize', element: <Organizer /> },
-          { path: '/courses/:id', element: <CoursePage /> },
-          { path: '/sections/:id', element: <SectionPage /> },
+          { path: '/courses/:id', element: <KeyedById page={CoursePage} /> },
+          { path: '/sections/:id', element: <KeyedById page={SectionPage} /> },
           { path: '/cards/new', element: <CardEditor /> },
           { path: '/cards/:id/edit', element: <CardEditor /> },
           { path: '/study/new', element: <SessionBuilder /> },
-          { path: '/study/:id/results', element: <SessionResultsPage /> },
+          { path: '/study/:id/results', element: <KeyedById page={SessionResultsPage} /> },
           { path: '/search', element: <SearchPage /> },
           { path: '/stats', element: <StatsPage /> },
           { path: '/settings', element: <SettingsPage /> },
