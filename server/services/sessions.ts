@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CardRender } from '../../shared/notes.ts';
 import { localDateOf } from '../../shared/dates.ts';
 import { examReviewDeadline } from '../../shared/exam-planner.ts';
 import { createQueue, progressOf, rate as queueRate, relax as queueRelax, selectNext, clampMaxAttempts, type QueueEntry, type QueueState } from '../../shared/queue.ts';
@@ -44,12 +45,13 @@ const filtersSchema = z.object({
   bookmarkedOnly: z.boolean().default(false),
   status: z.enum(['any', 'new', 'due', 'notDue', 'weak', 'reviewed']).default('any'),
   weakBasis: z.enum(['all', 'scheduled']).default('all'),
+  oneCardPerNote: z.boolean().default(true),
 });
 
 const requestSchema = z.object({
   mode: z.enum(['scheduled', 'practice', 'test']),
   scope: scopeSchema,
-  filters: filtersSchema.default({ includeNew: true, tags: [], bookmarkedOnly: false, status: 'any', weakBasis: 'all' }),
+  filters: filtersSchema.default({ includeNew: true, tags: [], bookmarkedOnly: false, status: 'any', weakBasis: 'all', oneCardPerNote: true }),
   ordering: z.enum(['default', 'random', 'weakest']).default('default'),
   size: z.number().int().min(1, 'Choose at least one card').max(MAX_SESSION_SIZE),
   maxAttempts: z.number().int().min(1).max(10).default(3),
@@ -75,6 +77,8 @@ interface Candidate {
   last_scheduled: number | null;
   last_any_at: string | null;
   last_scheduled_at: string | null;
+  note_id: string;
+  variant_order: number;
 }
 
 type Reason = 'due' | 'new' | 'notDue';
@@ -152,7 +156,7 @@ function loadCandidates(ctx: Ctx, scope: SessionScope): Candidate[] {
   return ctx.db
     .prepare(
       `SELECT c.id, c.section_id, c.course_id, c.created_at, c.position, c.suspended_at, c.bookmarked,
-         cs.due_date,
+         c.note_id, c.variant_order, cs.due_date,
          (SELECT position FROM courses WHERE id = c.course_id) AS course_pos,
          (SELECT position FROM sections WHERE id = c.section_id) AS section_pos,
          ${lastRating('', 'rating')} AS last_any,
@@ -187,6 +191,7 @@ const hierarchyOrder = (a: Candidate, b: Candidate) =>
   a.course_pos - b.course_pos ||
   a.section_pos - b.section_pos ||
   a.position - b.position ||
+  a.variant_order - b.variant_order ||
   a.created_at.localeCompare(b.created_at) ||
   a.id.localeCompare(b.id);
 
@@ -278,6 +283,16 @@ export function computeSelection(ctx: Ctx, req: SessionRequest, seed: number): S
   } else {
     ordered = eligible.sort(hierarchyOrder);
   }
+  // One card per note: keep the highest-priority sibling, so a reverse card or another gap
+  // of the same cloze can't give the answer away. An explicit card list is kept as given.
+  if (req.filters.oneCardPerNote !== false && !req.scope.cardIds?.length) {
+    const seenNotes = new Set<string>();
+    ordered = ordered.filter((c) => {
+      if (seenNotes.has(c.note_id)) return false;
+      seenNotes.add(c.note_id);
+      return true;
+    });
+  }
   let chosen = ordered.slice(0, req.size);
   // For random ordering, present the chosen cards in a shuffled order too (stable for this seed).
   if (req.ordering === 'random' && req.mode === 'scheduled') chosen = seededShuffle(chosen, seed ^ 0x5bd1e995);
@@ -289,7 +304,7 @@ export function computeSelection(ctx: Ctx, req: SessionRequest, seed: number): S
       scopeLabel: label,
       scopeItems: items,
       breakdown,
-      available: eligible.length,
+      available: ordered.length,
       requested: req.size,
       willSelect: selected.length,
       selection: {
@@ -544,6 +559,8 @@ export function createSession(ctx: Ctx, input: unknown): SessionState {
         sectionTitle: c.section_title,
         courseTitle: c.course_title,
         courseColor: c.course_color,
+        render: parseJson<CardRender>(c.render_json, { type: 'markdown' }),
+        variantLabel: c.variant_label,
       };
       insert.run(id, sel.id, i, i, sel.reason, c.revision, JSON.stringify(snap), c.section_id, c.course_id);
     });

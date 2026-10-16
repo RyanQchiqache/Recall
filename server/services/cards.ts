@@ -1,10 +1,26 @@
 import { z } from 'zod';
-import type { Card, CardFilter, CardListResponse } from '../../shared/types.ts';
+import type { Card, CardFilter, CardListResponse, Note } from '../../shared/types.ts';
 import { nowIso, type Ctx } from '../context.ts';
-import { badRequest, conflict, newId, notFound, placeholders } from '../lib/util.ts';
+import { badRequest, conflict, notFound, placeholders } from '../lib/util.ts';
 import { parse, zId } from '../lib/validate.ts';
 import { getRow, impactOf, itemState, moveToTrash, removeOrphanTags } from './hierarchy.ts';
 import { CARD_SELECT, toCard, type CardListRow, type CardRow } from './mappers.ts';
+import {
+  createNote,
+  duplicateNote,
+  getNote,
+  getNoteRow,
+  moveNotes,
+  normalizeTags,
+  noteIdOfCard,
+  noteOptions,
+  notesOfCards,
+  primaryCardId,
+  reorderNotes,
+  setCardTags,
+  touchNotesOfCards,
+  updateNote,
+} from './notes.ts';
 import { today } from './time.ts';
 
 const MAX_SIDE = 200_000;
@@ -22,6 +38,7 @@ const zSide = (label: string) =>
     .max(MAX_SIDE, `${label} is too long`)
     .refine((v) => v.trim().length > 0, `${label} is required`);
 
+/** The original card API: a basic note with one card. */
 const cardCreate = z.object({
   sectionId: zId,
   front: zSide('Front'),
@@ -31,6 +48,7 @@ const cardCreate = z.object({
   source: z.string().max(500).optional(),
   tags: z.array(zTag).max(50).optional(),
   bookmarked: z.boolean().optional(),
+  reverse: z.boolean().optional(),
 });
 
 const cardUpdate = cardCreate.partial().extend({
@@ -38,33 +56,7 @@ const cardUpdate = cardCreate.partial().extend({
   suspended: z.boolean().optional(),
 });
 
-export function normalizeTags(tags: string[] | undefined): string[] {
-  if (!tags) return [];
-  const seen = new Map<string, string>();
-  for (const t of tags) {
-    const clean = t.trim().replace(/\s+/g, ' ');
-    if (clean && !seen.has(clean.toLowerCase())) seen.set(clean.toLowerCase(), clean);
-  }
-  return [...seen.values()];
-}
-
-export function setCardTags(ctx: Ctx, cardId: string, tags: string[]) {
-  const db = ctx.db;
-  db.prepare('DELETE FROM card_tags WHERE card_id = ?').run(cardId);
-  for (const name of normalizeTags(tags)) {
-    let tag = db.prepare('SELECT id FROM tags WHERE name = ? COLLATE NOCASE').get(name) as { id: string } | undefined;
-    if (!tag) {
-      tag = { id: newId(ctx.now().getTime()) };
-      db.prepare('INSERT INTO tags (id, name, created_at) VALUES (?, ?, ?)').run(tag.id, name, nowIso(ctx));
-    }
-    db.prepare('INSERT OR IGNORE INTO card_tags (card_id, tag_id) VALUES (?, ?)').run(cardId, tag.id);
-  }
-}
-
-function assertSectionWritable(ctx: Ctx, sectionId: string) {
-  getRow(ctx, 'section', sectionId);
-  if (itemState(ctx, 'section', sectionId).inTrash) throw badRequest('That section is in the trash');
-}
+export { normalizeTags, setCardTags };
 
 export function getCard(ctx: Ctx, id: string): Card {
   const row = ctx.db
@@ -74,112 +66,97 @@ export function getCard(ctx: Ctx, id: string): Card {
   return toCard(row, today(ctx));
 }
 
-function nextCardPosition(ctx: Ctx, sectionId: string): number {
-  const r = ctx.db.prepare('SELECT MAX(position) AS m FROM cards WHERE section_id = ?').get(sectionId) as { m: number | null };
-  return (r.m ?? -1) + 1;
+/** A card with the note it belongs to (what the editor opens). */
+export function getCardWithNote(ctx: Ctx, id: string): { card: Card; note: Note } {
+  const card = getCard(ctx, id);
+  return { card, note: getNote(ctx, card.noteId) };
 }
 
 export function createCard(ctx: Ctx, input: unknown, opts: { isDemo?: boolean } = {}): Card {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  if (raw.kind !== undefined || raw.fields !== undefined) {
+    const { note } = createNote(ctx, input, opts);
+    return getCard(ctx, primaryCardId(ctx, note.id));
+  }
   const data = parse(cardCreate, input);
-  assertSectionWritable(ctx, data.sectionId);
-  const id = newId(ctx.now().getTime());
-  const ts = nowIso(ctx);
-  ctx.db.transaction(() => {
-    ctx.db
-      .prepare(
-        `INSERT INTO cards (id, section_id, front, back, explanation, hint, source, bookmarked, position, is_demo, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        data.sectionId,
-        data.front,
-        data.back,
-        data.explanation ?? '',
-        data.hint ?? '',
-        data.source?.trim() ?? '',
-        data.bookmarked ? 1 : 0,
-        nextCardPosition(ctx, data.sectionId),
-        opts.isDemo ? 1 : 0,
-        ts,
-        ts,
-      );
-    setCardTags(ctx, id, data.tags ?? []);
-  })();
-  return getCard(ctx, id);
+  const { note } = createNote(
+    ctx,
+    {
+      sectionId: data.sectionId,
+      kind: 'basic',
+      fields: { front: data.front, back: data.back, explanation: data.explanation ?? '', hint: data.hint ?? '', source: data.source ?? '' },
+      options: { reverse: data.reverse ?? false },
+      tags: data.tags ?? [],
+      bookmarked: data.bookmarked ?? false,
+    },
+    opts,
+  );
+  return getCard(ctx, primaryCardId(ctx, note.id));
 }
 
+/**
+ * Update a card through the original API. Content fields edit the card's (basic) note;
+ * `suspended` and `bookmarked` apply to this card only.
+ */
 export function updateCard(ctx: Ctx, id: string, input: unknown): Card {
   const data = parse(cardUpdate, input);
   const existing = ctx.db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow | undefined;
   if (!existing || existing.deleted_at) throw notFound('Card');
+  const note = getNoteRow(ctx, existing.note_id);
   if (itemState(ctx, 'section', existing.section_id).inTrash) {
     throw badRequest('This card’s section is in the trash. Restore it before editing the card.');
   }
-  if (data.revision !== undefined && data.revision !== existing.revision) {
-    throw conflict('revision_conflict', 'This card was changed elsewhere since you opened it.', {
-      current: getCard(ctx, id),
-    });
+  if (data.revision !== undefined && data.revision !== note.revision) {
+    throw conflict('revision_conflict', 'This card was changed elsewhere since you opened it.', { current: getCard(ctx, id) });
   }
-  if (data.sectionId && data.sectionId !== existing.section_id) assertSectionWritable(ctx, data.sectionId);
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  const set = (col: string, v: unknown) => {
-    sets.push(`${col} = ?`);
-    vals.push(v);
-  };
-  if (data.front !== undefined) set('front', data.front);
-  if (data.back !== undefined) set('back', data.back);
-  if (data.explanation !== undefined) set('explanation', data.explanation);
-  if (data.hint !== undefined) set('hint', data.hint);
-  if (data.source !== undefined) set('source', data.source.trim());
-  if (data.bookmarked !== undefined) set('bookmarked', data.bookmarked ? 1 : 0);
-  if (data.suspended !== undefined) set('suspended_at', data.suspended ? (existing.suspended_at ?? nowIso(ctx)) : null);
-  if (data.sectionId && data.sectionId !== existing.section_id) {
-    set('section_id', data.sectionId);
-    set('position', nextCardPosition(ctx, data.sectionId));
+  const contentKeys = ['front', 'back', 'explanation', 'hint', 'source'] as const;
+  const touchesContent = contentKeys.some((k) => data[k] !== undefined) || data.reverse !== undefined;
+  if (touchesContent && note.kind !== 'basic') {
+    throw badRequest('This card is generated from a note with several cards. Open it in the editor to change its content.');
   }
   ctx.db.transaction(() => {
-    if (sets.length > 0 || data.tags) {
-      set('revision', existing.revision + 1);
-      set('updated_at', nowIso(ctx));
-      ctx.db.prepare(`UPDATE cards SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+    if (touchesContent || data.tags || (data.sectionId && data.sectionId !== note.section_id)) {
+      const fields: Record<string, string> = {};
+      for (const k of contentKeys) if (data[k] !== undefined) fields[k] = data[k]!;
+      updateNote(
+        ctx,
+        note.id,
+        {
+          ...(touchesContent ? { fields } : {}),
+          ...(data.reverse !== undefined ? { options: { ...noteOptions(note), reverse: data.reverse } } : {}),
+          ...(data.tags ? { tags: data.tags } : {}),
+          ...(data.sectionId ? { sectionId: data.sectionId } : {}),
+        },
+        { skipRevisionCheck: true },
+      );
     }
-    if (data.tags) {
-      setCardTags(ctx, id, data.tags);
-      removeOrphanTags(ctx);
+    const ts = nowIso(ctx);
+    if (data.suspended !== undefined) {
+      ctx.db.prepare('UPDATE cards SET suspended_at = ?, updated_at = ? WHERE id = ?').run(data.suspended ? (existing.suspended_at ?? ts) : null, ts, id);
     }
+    if (data.bookmarked !== undefined) ctx.db.prepare('UPDATE cards SET bookmarked = ?, updated_at = ? WHERE id = ?').run(data.bookmarked ? 1 : 0, ts, id);
+    if ((data.suspended !== undefined || data.bookmarked !== undefined) && !touchesContent && !data.tags && !data.sectionId) touchNotesOfCards(ctx, [id]);
   })();
   return getCard(ctx, id);
 }
 
 export function duplicateCard(ctx: Ctx, id: string): Card {
-  const src = getCard(ctx, id);
-  return createCard(ctx, {
-    sectionId: src.sectionId,
-    front: src.front,
-    back: src.back,
-    explanation: src.explanation,
-    hint: src.hint,
-    source: src.source,
-    tags: src.tags,
-  });
+  const note = duplicateNote(ctx, noteIdOfCard(ctx, id));
+  return getCard(ctx, primaryCardId(ctx, note.id));
 }
 
+/** Reorder cards in a section. Cards of the same note always move together. */
 export function reorderCards(ctx: Ctx, input: unknown) {
   const data = parse(z.object({ sectionId: zId, ids: z.array(zId).min(1).max(5000) }), input);
   if (new Set(data.ids).size !== data.ids.length) throw badRequest('Each card may appear only once in the order');
-  assertSectionWritable(ctx, data.sectionId);
-  const siblings = ctx.db
-    .prepare('SELECT id FROM cards WHERE section_id = ? ORDER BY position, created_at, id')
-    .all(data.sectionId) as { id: string }[];
-  const siblingIds = new Set(siblings.map((card) => card.id));
-  for (const id of data.ids) if (!siblingIds.has(id)) throw badRequest('All reordered cards must belong to the same section');
-  const listed = new Set(data.ids);
-  const finalOrder = [...data.ids, ...siblings.map((card) => card.id).filter((id) => !listed.has(id))];
-  const update = ctx.db.prepare('UPDATE cards SET position = ?, updated_at = ? WHERE id = ?');
-  const ts = nowIso(ctx);
-  ctx.db.transaction(() => finalOrder.forEach((id, position) => update.run(position, ts, id)))();
+  getRow(ctx, 'section', data.sectionId);
+  if (itemState(ctx, 'section', data.sectionId).inTrash) throw badRequest('That section is in the trash');
+  const inSection = ctx.db.prepare('SELECT section_id FROM cards WHERE id = ?');
+  for (const id of data.ids) {
+    const r = inSection.get(id) as { section_id: string } | undefined;
+    if (!r || r.section_id !== data.sectionId) throw badRequest('All reordered cards must belong to the same section');
+  }
+  ctx.db.transaction(() => reorderNotes(ctx, data.sectionId, notesOfCards(ctx, data.ids)))();
   return { ok: true };
 }
 
@@ -280,7 +257,7 @@ export function listCards(ctx: Ctx, query: ListQuery): CardListResponse {
       ? 'updated_at DESC, id'
       : query.sort === 'due'
         ? 'CASE WHEN s_due_date IS NULL THEN 1 ELSE 0 END, s_due_date, id'
-        : '(SELECT position FROM courses WHERE id = course_id), (SELECT position FROM sections WHERE id = section_id), position, created_at, id';
+        : '(SELECT position FROM courses WHERE id = course_id), (SELECT position FROM sections WHERE id = section_id), position, variant_order, created_at, id';
   const inner = `SELECT ${CARD_SELECT} FROM card_ctx c LEFT JOIN card_schedules cs ON cs.card_id = c.id WHERE ${where.join(' AND ')}`;
   const outerWhere = outer.length ? `WHERE ${outer.join(' AND ')}` : '';
   const total = (ctx.db.prepare(`SELECT COUNT(*) AS n FROM (${inner}) ${outerWhere}`).get(...params) as { n: number }).n;
@@ -323,39 +300,41 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number } {
     switch (data.action) {
       case 'move': {
         if (!data.sectionId) throw badRequest('Choose a destination section');
-        assertSectionWritable(ctx, data.sectionId);
-        let pos = nextCardPosition(ctx, data.sectionId);
-        const stmt = db.prepare('UPDATE cards SET section_id = ?, position = ?, revision = revision + 1, updated_at = ? WHERE id = ?');
-        for (const id of ids) stmt.run(data.sectionId, pos++, ts, id);
+        // Cards of one note stay together, so moving a card moves its whole note.
+        moveNotes(ctx, notesOfCards(ctx, ids), data.sectionId);
         break;
       }
       case 'addTags':
       case 'removeTags': {
         const tags = normalizeTags(data.tags);
         if (tags.length === 0) throw badRequest('Enter at least one tag');
-        for (const id of ids) {
+        const lower = new Set(tags.map((t) => t.toLowerCase()));
+        for (const noteId of notesOfCards(ctx, ids)) {
+          const live = db.prepare('SELECT id FROM cards WHERE note_id = ? AND retired_at IS NULL').all(noteId) as { id: string }[];
           const current = (
-            db.prepare('SELECT t.name FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = ?').all(id) as { name: string }[]
+            db.prepare('SELECT t.name FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = ?').all(live[0]?.id ?? '') as { name: string }[]
           ).map((r) => r.name);
-          const lower = new Set(tags.map((t) => t.toLowerCase()));
-          const next =
-            data.action === 'addTags' ? [...current, ...tags] : current.filter((t) => !lower.has(t.toLowerCase()));
-          setCardTags(ctx, id, next);
-          db.prepare('UPDATE cards SET revision = revision + 1, updated_at = ? WHERE id = ?').run(ts, id);
+          const next = data.action === 'addTags' ? [...current, ...tags] : current.filter((t) => !lower.has(t.toLowerCase()));
+          for (const c of live) setCardTags(ctx, c.id, next);
+          db.prepare('UPDATE notes SET revision = revision + 1, updated_at = ? WHERE id = ?').run(ts, noteId);
+          db.prepare('UPDATE cards SET revision = revision + 1, updated_at = ? WHERE note_id = ? AND retired_at IS NULL').run(ts, noteId);
         }
         removeOrphanTags(ctx);
         break;
       }
-      // Every change bumps the revision so an editor opened earlier gets a conflict instead of overwriting it.
+      // Card-level changes bump the note's revision so an editor opened earlier gets a conflict instead of overwriting it.
       case 'suspend':
         db.prepare(`UPDATE cards SET suspended_at = COALESCE(suspended_at, ?), revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ts, ...ids);
+        touchNotesOfCards(ctx, ids);
         break;
       case 'unsuspend':
         db.prepare(`UPDATE cards SET suspended_at = NULL, revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(ts, ...ids);
+        touchNotesOfCards(ctx, ids);
         break;
       case 'bookmark':
       case 'unbookmark':
         db.prepare(`UPDATE cards SET bookmarked = ?, revision = revision + 1, updated_at = ? WHERE id IN (${placeholders(ids.length)})`).run(data.action === 'bookmark' ? 1 : 0, ts, ...ids);
+        touchNotesOfCards(ctx, ids);
         break;
       case 'delete':
         for (const id of ids) {

@@ -6,6 +6,8 @@ import { conflict } from '../lib/util.ts';
 import { createCard } from './cards.ts';
 import { createItem, removeOrphanTags } from './hierarchy.ts';
 import { saveMedia } from './media.ts';
+import { createNote } from './notes.ts';
+import { createTemplate } from './templates.ts';
 
 /** Generate the IoU illustration used by one demo card. */
 function iouFigure(): Buffer {
@@ -143,6 +145,75 @@ export function loadDemo(ctx: Ctx): { programId: string; courseId: string } {
       },
     ];
     for (const c of cards) createCard(ctx, c, demo);
+
+    // One example of each card type.
+    createNote(ctx, {
+      sectionId: w1.id,
+      kind: 'basic',
+      fields: { front: '**Stride** (convolution)', back: 'The step size with which the kernel moves across the input.', explanation: '', hint: '', source: 'Demo — Week 01' },
+      options: { reverse: true },
+      tags: ['demo', 'vocabulary'],
+    }, demo);
+    createNote(ctx, {
+      sectionId: w1.id,
+      kind: 'cloze',
+      fields: {
+        text: 'The {{c1::Sobel}} operator estimates the image {{c2::gradient::a vector of derivatives}}; Canny then applies {{c3::non-maximum suppression}} to thin the edges.',
+        explanation: 'Each gap is its own card with its own schedule.',
+        hint: '',
+        source: 'Demo — Week 01',
+      },
+      tags: ['demo'],
+    }, demo);
+    createNote(ctx, {
+      sectionId: w1.id,
+      kind: 'cloze',
+      fields: {
+        text: 'A Gaussian kernel is separable: $G_\\sigma(x, y) = {{c1::g_\\sigma(x)\\, g_\\sigma(y)}}$, which reduces the cost per pixel from $O(k^2)$ to {{c2::$O(2k)$}}.',
+        explanation: '',
+        hint: '',
+        source: 'Demo — Week 01',
+      },
+      tags: ['demo', 'math'],
+    }, demo);
+    createNote(ctx, {
+      sectionId: w2.id,
+      kind: 'occlusion',
+      fields: {
+        image: image.url,
+        header: 'Green: ground-truth box. Indigo: predicted box.',
+        masks: [
+          { id: 'demoint1', x: 0.3906, y: 0.3611, w: 0.2031, h: 0.3889, label: 'Intersection (A ∩ B)' },
+          { id: 'demopred', x: 0.5938, y: 0.3611, w: 0.2188, h: 0.5, label: 'Prediction only (B \\ A)' },
+        ],
+        explanation: 'IoU = intersection ÷ union.',
+        hint: '',
+        source: 'Demo — Week 02',
+      },
+      options: { occlusionMode: 'hide-all' },
+      tags: ['demo'],
+    }, demo);
+    const tpl = createTemplate(ctx, {
+      name: 'Term · definition · example (demo)',
+      fields: [{ name: 'Term' }, { name: 'Definition' }, { name: 'Example' }],
+      cards: [
+        { name: 'Term → definition', front: '{{Term}}', back: '{{FrontSide}}\n\n---\n\n{{Definition}}{{#Example}}\n\n*Example:* {{Example}}{{/Example}}' },
+        { name: 'Definition → term', front: '{{Definition}}', back: '{{Term}}' },
+      ],
+    }, demo);
+    const [fTerm, fDef, fEx] = tpl.fields.map((f) => f.id);
+    createNote(ctx, {
+      sectionId: w2.id,
+      kind: 'template',
+      templateId: tpl.id,
+      fields: {
+        values: { [fTerm]: 'Receptive field', [fDef]: 'The region of the input image that affects one unit of a feature map.', [fEx]: 'Two stacked 3×3 convolutions see a 5×5 region.' },
+        explanation: '',
+        hint: '',
+        source: 'Demo — Week 02',
+      },
+      tags: ['demo', 'vocabulary'],
+    }, demo);
     ids = { programId: program.id, courseId: course.id };
   })();
   return ids;
@@ -163,6 +234,7 @@ export function removeDemo(ctx: Ctx): { removedPrograms: number } {
     // Demo items created under the user's own hierarchy are not touched; only demo-flagged trees are removed.
     ctx.db.prepare('DELETE FROM study_sessions WHERE is_open IS NULL AND id NOT IN (SELECT DISTINCT session_id FROM session_cards)').run();
     ctx.db.prepare('DELETE FROM media_assets WHERE is_demo = 1').run();
+    ctx.db.prepare('DELETE FROM note_templates WHERE is_demo = 1 AND id NOT IN (SELECT template_id FROM notes WHERE template_id IS NOT NULL)').run();
     removeOrphanTags(ctx);
   })();
   for (const m of media) fs.rmSync(path.join(ctx.config.mediaDir, m.filename), { force: true });

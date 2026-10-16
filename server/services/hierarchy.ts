@@ -20,11 +20,13 @@ import {
   toProgram,
   toSection,
   toSemester,
+  type CardRow,
   type CourseRow,
   type ProgramRow,
   type SectionRow,
   type SemesterRow,
 } from './mappers.ts';
+import { noteDisplayTitle, restoreNote, trashNote, type NoteRow } from './notes.ts';
 import { getSettings } from './settings.ts';
 import { today } from './time.ts';
 
@@ -363,8 +365,24 @@ const SCOPE_COL: Record<TrashType, string> = {
 };
 
 export function impactOf(ctx: Ctx, type: TrashType, id: string): ImpactCounts {
-  const col = SCOPE_COL[type];
   const db = ctx.db;
+  if (type === 'card') {
+    // Deleting a card deletes its note, so the impact covers every card the note generated.
+    const note = `(SELECT note_id FROM cards WHERE id = ?)`;
+    const n = (sql: string) => (db.prepare(sql).get(id) as { n: number }).n;
+    return {
+      semesters: 0,
+      courses: 0,
+      sections: 0,
+      cards: n(`SELECT COUNT(*) AS n FROM cards WHERE note_id = ${note} AND retired_at IS NULL`),
+      reviews: n(`SELECT COUNT(*) AS n FROM review_events re JOIN cards c ON c.id = re.card_id WHERE c.note_id = ${note} AND re.undone_at IS NULL`),
+      openSessionCards: n(
+        `SELECT COUNT(*) AS n FROM session_cards sc JOIN study_sessions s ON s.id = sc.session_id AND s.is_open = 1
+         JOIN cards c ON c.id = sc.card_id WHERE c.note_id = ${note}`,
+      ),
+    };
+  }
+  const col = SCOPE_COL[type];
   const one = (sql: string) => (db.prepare(sql).get(id) as { n: number }).n;
   const semesters = type === 'program' ? one('SELECT COUNT(*) AS n FROM semesters WHERE program_id = ?') : 0;
   const courses =
@@ -374,7 +392,7 @@ export function impactOf(ctx: Ctx, type: TrashType, id: string): ImpactCounts {
         ? one('SELECT COUNT(*) AS n FROM courses WHERE semester_id = ?')
         : 0;
   const sections =
-    type === 'card' || type === 'section' ? 0 : one(`SELECT COUNT(*) AS n FROM section_ctx WHERE ${col === 'section_id' ? 'id' : col} = ?`);
+    type === 'section' ? 0 : one(`SELECT COUNT(*) AS n FROM section_ctx WHERE ${col === 'section_id' ? 'id' : col} = ?`);
   const cards = one(`SELECT COUNT(*) AS n FROM card_ctx WHERE ${col} = ?`);
   const reviews = one(
     `SELECT COUNT(*) AS n FROM review_events re JOIN card_ctx c ON c.id = re.card_id WHERE c.${col} = ? AND re.undone_at IS NULL`,
@@ -406,6 +424,16 @@ const TRASH_TABLE: Record<TrashType, string> = {
 };
 
 export function moveToTrash(ctx: Ctx, type: TrashType, id: string) {
+  if (type === 'card') {
+    const row = ctx.db.prepare('SELECT n.id, n.deleted_at FROM cards c JOIN notes n ON n.id = c.note_id WHERE c.id = ?').get(id) as
+      | { id: string; deleted_at: string | null }
+      | undefined;
+    if (!row) throw notFound('Item');
+    if (row.deleted_at) return;
+    assertNotInOpenSession(ctx, type, id);
+    ctx.db.transaction(() => trashNote(ctx, row.id))();
+    return;
+  }
   const table = TRASH_TABLE[type];
   const row = ctx.db.prepare(`SELECT id, deleted_at FROM ${table} WHERE id = ?`).get(id) as
     | { id: string; deleted_at: string | null }
@@ -417,12 +445,30 @@ export function moveToTrash(ctx: Ctx, type: TrashType, id: string) {
 }
 
 export function restoreFromTrash(ctx: Ctx, type: TrashType, id: string) {
+  if (type === 'card') {
+    const noteId = (ctx.db.prepare('SELECT note_id FROM cards WHERE id = ?').get(id) as { note_id: string } | undefined)?.note_id;
+    if (!noteId || !ctx.db.transaction(() => restoreNote(ctx, noteId))()) throw notFound('Item in trash');
+    return;
+  }
   const table = TRASH_TABLE[type];
   const r = ctx.db.prepare(`UPDATE ${table} SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL`).run(nowIso(ctx), id);
   if (r.changes === 0) throw notFound('Item in trash');
 }
 
 export function purge(ctx: Ctx, type: TrashType, id: string) {
+  if (type === 'card') {
+    const row = ctx.db.prepare('SELECT n.id, n.deleted_at FROM cards c JOIN notes n ON n.id = c.note_id WHERE c.id = ?').get(id) as
+      | { id: string; deleted_at: string | null }
+      | undefined;
+    if (!row) throw notFound('Item');
+    if (!row.deleted_at) throw badRequest('Only items in the trash can be deleted permanently');
+    assertNotInOpenSession(ctx, type, id);
+    ctx.db.transaction(() => {
+      ctx.db.prepare('DELETE FROM notes WHERE id = ?').run(row.id); // cards, schedules and history cascade
+      removeOrphanTags(ctx);
+    })();
+    return;
+  }
   const table = TRASH_TABLE[type];
   const row = ctx.db.prepare(`SELECT deleted_at FROM ${table} WHERE id = ?`).get(id) as
     | { deleted_at: string | null }
@@ -478,9 +524,14 @@ export function listTrash(ctx: Ctx): TrashItem[] {
   push('semester', db.prepare('SELECT id, title, deleted_at FROM semesters WHERE deleted_at IS NOT NULL').all() as never, 'program', parentLookup('semesters', 'program_id'));
   push('course', db.prepare('SELECT id, title, deleted_at FROM courses WHERE deleted_at IS NOT NULL').all() as never, 'semester', parentLookup('courses', 'semester_id'));
   push('section', db.prepare('SELECT id, title, deleted_at FROM sections WHERE deleted_at IS NOT NULL').all() as never, 'course', parentLookup('sections', 'course_id'));
+  // Deleted notes, each listed once through its first card (the trash UI works with card ids).
+  const deletedNotes = db.prepare('SELECT * FROM notes WHERE deleted_at IS NOT NULL').all() as NoteRow[];
   push(
     'card',
-    db.prepare("SELECT id, substr(front, 1, 160) AS title, deleted_at FROM cards WHERE deleted_at IS NOT NULL").all() as never,
+    deletedNotes.flatMap((n) => {
+      const rep = db.prepare('SELECT id FROM cards WHERE note_id = ? ORDER BY retired_at IS NOT NULL, variant_order LIMIT 1').get(n.id) as { id: string } | undefined;
+      return rep ? [{ id: rep.id, title: noteDisplayTitle(ctx, n), deleted_at: n.deleted_at! }] : [];
+    }),
     'section',
     parentLookup('cards', 'section_id'),
   );
@@ -519,21 +570,29 @@ export function duplicateCourse(
         `INSERT INTO sections (id, course_id, title, kind, week_number, date, notes, position, is_demo, archived_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
       ).run(sid, newCourseId, s.title, s.kind, s.week_number, s.notes, s.position, s.is_demo, s.archived_at, ts, ts);
-      const cards = db
-        .prepare('SELECT * FROM cards WHERE section_id = ? AND deleted_at IS NULL ORDER BY position')
-        .all(s.id) as { id: string }[];
-      for (const c of cards) {
-        const cid = newId(t);
+      const notes = db.prepare('SELECT * FROM notes WHERE section_id = ? AND deleted_at IS NULL ORDER BY position').all(s.id) as NoteRow[];
+      for (const n of notes) {
+        const nid = newId(t);
         db.prepare(
-          `INSERT INTO cards (id, section_id, front, back, explanation, hint, source, bookmarked, suspended_at, position, revision, is_demo, created_at, updated_at)
-           SELECT ?, ?, front, back, explanation, hint, source, bookmarked, suspended_at, position, 1, is_demo, ?, ? FROM cards WHERE id = ?`,
-        ).run(cid, sid, ts, ts, c.id);
-        db.prepare('INSERT INTO card_tags (card_id, tag_id) SELECT ?, tag_id FROM card_tags WHERE card_id = ?').run(cid, c.id);
-        if (input.copyProgress) {
+          `INSERT INTO notes (id, section_id, kind, template_id, fields_json, options_json, position, is_demo, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(nid, sid, n.kind, n.template_id, n.fields_json, n.options_json, n.position, n.is_demo, ts, ts);
+        const cards = db.prepare('SELECT * FROM cards WHERE note_id = ? AND retired_at IS NULL ORDER BY variant_order').all(n.id) as CardRow[];
+        for (const c of cards) {
+          const cid = newId(t);
           db.prepare(
-            `INSERT INTO card_schedules (card_id, due_date, interval_days, review_count, lapse_count, first_reviewed_at, last_reviewed_at, last_rating, scheduler_version, updated_at)
-             SELECT ?, due_date, interval_days, review_count, lapse_count, first_reviewed_at, last_reviewed_at, last_rating, scheduler_version, ? FROM card_schedules WHERE card_id = ?`,
-          ).run(cid, ts, c.id);
+            `INSERT INTO cards (id, note_id, section_id, variant, variant_order, variant_label, render_json, front, back, explanation, hint, source,
+               bookmarked, suspended_at, position, revision, is_demo, created_at, updated_at)
+             SELECT ?, ?, ?, variant, variant_order, variant_label, render_json, front, back, explanation, hint, source,
+               bookmarked, suspended_at, position, 1, is_demo, ?, ? FROM cards WHERE id = ?`,
+          ).run(cid, nid, sid, ts, ts, c.id);
+          db.prepare('INSERT INTO card_tags (card_id, tag_id) SELECT ?, tag_id FROM card_tags WHERE card_id = ?').run(cid, c.id);
+          if (input.copyProgress) {
+            db.prepare(
+              `INSERT INTO card_schedules (card_id, due_date, interval_days, review_count, lapse_count, first_reviewed_at, last_reviewed_at, last_rating, scheduler_version, updated_at)
+               SELECT ?, due_date, interval_days, review_count, lapse_count, first_reviewed_at, last_reviewed_at, last_rating, scheduler_version, ? FROM card_schedules WHERE card_id = ?`,
+            ).run(cid, ts, c.id);
+          }
         }
       }
     }

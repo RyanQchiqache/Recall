@@ -4,13 +4,15 @@ import type { CsvPreview, CsvPreviewRow } from '../../shared/types.ts';
 import { nowIso, type Ctx } from '../context.ts';
 import { badRequest, newId, normalizeForCompare } from '../lib/util.ts';
 import { parse, zId } from '../lib/validate.ts';
-import { normalizeTags, setCardTags } from './cards.ts';
+import { noteProblems } from '../../shared/notes.ts';
+import { normalizeTags } from './cards.ts';
+import { createNote, noteFields, noteOptions, type NoteRow } from './notes.ts';
 import { getRow, itemState } from './hierarchy.ts';
 
 const MAX_CSV_CHARS = 10 * 1024 * 1024;
 const MAX_ROWS = 20_000;
 
-export const CSV_FIELDS = ['front', 'back', 'section', 'tags', 'source', 'explanation', 'hint'] as const;
+export const CSV_FIELDS = ['front', 'back', 'section', 'tags', 'source', 'explanation', 'hint', 'type'] as const;
 type Field = (typeof CSV_FIELDS)[number];
 
 const mappingSchema = z.object({
@@ -21,6 +23,7 @@ const mappingSchema = z.object({
   source: z.number().int().min(0).nullable().optional(),
   explanation: z.number().int().min(0).nullable().optional(),
   hint: z.number().int().min(0).nullable().optional(),
+  type: z.number().int().min(0).nullable().optional(),
 });
 type Mapping = z.infer<typeof mappingSchema>;
 
@@ -61,6 +64,7 @@ export function inspectCsv(text: string) {
     source: ['source', 'reference', 'ref', 'slide'],
     explanation: ['explanation', 'notes', 'extra'],
     hint: ['hint'],
+    type: ['type', 'card type', 'kind', 'note type'],
   };
   for (const f of CSV_FIELDS) {
     const idx = headers.findIndex((h) => aliases[f].includes(h.toLowerCase()));
@@ -71,9 +75,28 @@ export function inspectCsv(text: string) {
   return { headers, sample: rows.slice(1, 6), totalRows: Math.max(0, rows.length - 1), suggestedMapping: guess };
 }
 
+type CsvCardType = 'basic' | 'reverse' | 'cloze';
+
+/** The card-type column: empty means basic. */
+function parseType(raw: string): { type: CsvCardType } | { error: string } {
+  const v = raw.trim().toLowerCase();
+  if (!v || v === 'basic') return { type: 'basic' };
+  if (['reverse', 'reversed', 'basic+reverse', 'basic (and reversed card)', 'both'].includes(v)) return { type: 'reverse' };
+  if (v === 'cloze') return { type: 'cloze' };
+  if (['occlusion', 'image occlusion', 'template'].includes(v)) {
+    return { error: `“${raw.trim()}” cards can’t be imported from CSV; move them with a course package instead` };
+  }
+  return { error: `Unknown card type “${raw.trim()}” (use basic, reverse or cloze)` };
+}
+
+/** Comparable content of a note for duplicate detection within a section. */
+function dupKey(sectionId: string, type: CsvCardType, front: string, back: string): string {
+  return type === 'cloze' ? `${sectionId}|cloze|${normalizeForCompare(front)}` : `${sectionId}|basic|${normalizeForCompare(front)}|${normalizeForCompare(back)}`;
+}
+
 interface Plan {
   preview: CsvPreview;
-  rows: (CsvPreviewRow & { explanation: string; hint: string; sectionKey: string })[];
+  rows: (CsvPreviewRow & { explanation: string; hint: string; sectionKey: string; cardType: CsvCardType })[];
   sectionIdByKey: Map<string, string>;
 }
 
@@ -102,9 +125,15 @@ function plan(ctx: Ctx, input: unknown): Plan & { courseId: string } {
   // Existing content per section for duplicate detection.
   const seen = new Set<string>();
   const existing = ctx.db
-    .prepare('SELECT section_id, front, back FROM cards WHERE deleted_at IS NULL AND section_id IN (SELECT id FROM sections WHERE course_id = ?)')
-    .all(data.courseId) as { section_id: string; front: string; back: string }[];
-  for (const c of existing) seen.add(`${c.section_id}|${normalizeForCompare(c.front)}|${normalizeForCompare(c.back)}`);
+    .prepare(
+      `SELECT section_id, kind, json_extract(fields_json, '$.front') AS front, json_extract(fields_json, '$.back') AS back,
+         json_extract(fields_json, '$.text') AS text
+       FROM notes WHERE deleted_at IS NULL AND kind IN ('basic', 'cloze') AND section_id IN (SELECT id FROM sections WHERE course_id = ?)`,
+    )
+    .all(data.courseId) as { section_id: string; kind: string; front: string | null; back: string | null; text: string | null }[];
+  for (const n of existing) {
+    seen.add(n.kind === 'cloze' ? dupKey(n.section_id, 'cloze', n.text ?? '', '') : dupKey(n.section_id, 'basic', n.front ?? '', n.back ?? ''));
+  }
 
   const cell = (r: string[], idx: number | null | undefined) => (idx === null || idx === undefined ? '' : unescapeCell(r[idx] ?? ''));
   const toCreate = new Map<string, string>();
@@ -116,8 +145,16 @@ function plan(ctx: Ctx, input: unknown): Plan & { courseId: string } {
     const tags = normalizeTags(cell(r, m.tags).split(/[;,|]/));
     const source = cell(r, m.source).trim().slice(0, 500);
     const errors: string[] = [];
-    if (!front.trim()) errors.push('Front is empty');
-    if (!back.trim()) errors.push('Back is empty');
+    const typed = parseType(cell(r, m.type));
+    const cardType: CsvCardType = 'type' in typed ? typed.type : 'basic';
+    if ('error' in typed) errors.push(typed.error);
+    else if (cardType === 'cloze') {
+      if (!front.trim()) errors.push('Front is empty (for cloze rows it holds the text with {{c1::…}} gaps)');
+      else errors.push(...noteProblems('cloze', { text: front, explanation: '', hint: '', source: '' }));
+    } else {
+      if (!front.trim()) errors.push('Front is empty');
+      if (!back.trim()) errors.push('Back is empty');
+    }
     if (front.length > 200_000 || back.length > 200_000) errors.push('Text is too long');
     if (tags.some((t) => t.length > 60)) errors.push('A tag is longer than 60 characters');
     let sectionKey = '';
@@ -132,7 +169,7 @@ function plan(ctx: Ctx, input: unknown): Plan & { courseId: string } {
     let status: CsvPreviewRow['status'] = errors.length ? 'error' : 'ok';
     if (status === 'ok') {
       const target = sectionKey.startsWith('id:') ? sectionKey.slice(3) : (sectionIdByKey.get(sectionKey) ?? `new:${sectionKey}`);
-      const key = `${target}|${normalizeForCompare(front)}|${normalizeForCompare(back)}`;
+      const key = dupKey(target, cardType, front, back);
       if (seen.has(key)) status = 'duplicate';
       else seen.add(key);
     }
@@ -148,12 +185,14 @@ function plan(ctx: Ctx, input: unknown): Plan & { courseId: string } {
       explanation: cell(r, m.explanation),
       hint: cell(r, m.hint),
       sectionKey,
+      cardType,
+      type: cardType,
     });
   });
   const preview: CsvPreview = {
     headers,
     totalRows: rows.length,
-    rows: rows.slice(0, 300).map(({ explanation: _e, hint: _h, sectionKey: _k, ...rest }) => rest),
+    rows: rows.slice(0, 300).map(({ explanation: _e, hint: _h, sectionKey: _k, cardType: _c, ...rest }) => rest),
     valid: rows.filter((r) => r.status === 'ok').length,
     errors: rows.filter((r) => r.status === 'error').length,
     duplicates: rows.filter((r) => r.status === 'duplicate').length,
@@ -196,12 +235,20 @@ export function applyCsv(ctx: Ctx, input: unknown): { imported: number; skippedD
         }
         sectionId = existing;
       }
-      const pos = (db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cards WHERE section_id = ?').get(sectionId) as { p: number }).p;
-      const id = newId(t);
-      db.prepare(
-        'INSERT INTO cards (id, section_id, front, back, explanation, hint, source, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ).run(id, sectionId, r.front, r.back, r.explanation, r.hint.slice(0, 10_000), r.source, pos, ts, ts);
-      setCardTags(ctx, id, r.tags);
+      const extras = { hint: r.hint.slice(0, 10_000), source: r.source };
+      if (r.cardType === 'cloze') {
+        // For cloze rows the back column is extra information shown after the answer.
+        const explanation = [r.back.trim(), r.explanation.trim()].filter(Boolean).join('\n\n');
+        createNote(ctx, { sectionId, kind: 'cloze', fields: { text: r.front, explanation, ...extras }, tags: r.tags });
+      } else {
+        createNote(ctx, {
+          sectionId,
+          kind: 'basic',
+          fields: { front: r.front, back: r.back, explanation: r.explanation, ...extras },
+          options: { reverse: r.cardType === 'reverse' },
+          tags: r.tags,
+        });
+      }
       imported++;
     }
   })();
@@ -231,17 +278,32 @@ export function exportCsv(ctx: Ctx, opts: { courseId?: string; sectionId?: strin
     where = 's.course_id = ?';
     id = opts.courseId;
   } else throw badRequest('Choose a course or section to export');
-  const rows = ctx.db
+  const notes = ctx.db
     .prepare(
-      `SELECT c.front, c.back, c.explanation, c.hint, s.title AS section, c.source,
-        (SELECT group_concat(t.name, '; ') FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = c.id) AS tags
-       FROM cards c JOIN sections s ON s.id = c.section_id
-       WHERE c.deleted_at IS NULL AND s.deleted_at IS NULL AND ${where}
-       ORDER BY s.position, c.position, c.created_at`,
+      `SELECT n.*, s.title AS section_title FROM notes n JOIN sections s ON s.id = n.section_id
+       WHERE n.deleted_at IS NULL AND s.deleted_at IS NULL AND ${where.replace('c.section_id', 'n.section_id')}
+       ORDER BY s.position, n.position, n.created_at`,
     )
-    .all(id) as Record<string, string | null>[];
-  const header = ['front', 'back', 'section', 'tags', 'source', 'explanation', 'hint'];
-  const data = rows.map((r) => header.map((h) => escapeFormula(r[h] ?? '')));
+    .all(id) as (NoteRow & { section_title: string })[];
+  const header = ['front', 'back', 'section', 'tags', 'source', 'explanation', 'hint', 'type'];
+  const tagStmt = ctx.db.prepare(
+    `SELECT group_concat(t.name, '; ') AS tags FROM card_tags ct JOIN tags t ON t.id = ct.tag_id
+     WHERE ct.card_id = (SELECT id FROM cards WHERE note_id = ? ORDER BY retired_at IS NOT NULL, variant_order LIMIT 1)`,
+  );
+  const firstCard = ctx.db.prepare('SELECT front, back FROM cards WHERE note_id = ? AND retired_at IS NULL ORDER BY variant_order LIMIT 1');
+  const data = notes.map((n) => {
+    const f = noteFields(n) as unknown as Record<string, string>;
+    const common = { section: n.section_title, tags: (tagStmt.get(n.id) as { tags: string | null }).tags ?? '', source: f.source ?? '', explanation: f.explanation ?? '', hint: f.hint ?? '' };
+    let row: Record<string, string>;
+    if (n.kind === 'basic') row = { ...common, front: f.front, back: f.back, type: noteOptions(n).reverse ? 'reverse' : 'basic' };
+    else if (n.kind === 'cloze') row = { ...common, front: f.text, back: '', type: 'cloze' };
+    else {
+      // Image occlusion and template notes are exported as readable text; re-import them with a course package.
+      const c = (firstCard.get(n.id) as { front: string; back: string } | undefined) ?? { front: '', back: '' };
+      row = { ...common, front: c.front, back: c.back, type: n.kind };
+    }
+    return header.map((h) => escapeFormula(row[h] ?? ''));
+  });
   const text = '﻿' + Papa.unparse({ fields: header, data }, { quotes: false, newline: '\r\n' });
   const safe = title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'cards';
   return { filename: `recall-${safe}.csv`, text };

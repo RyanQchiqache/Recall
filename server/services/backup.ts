@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { unzipSync, zipSync, type Zippable } from 'fflate';
 import { COURSE_COLORS, COURSE_ICONS, SECTION_KINDS } from '../../shared/catalog.ts';
 import { isLocalDate } from '../../shared/dates.ts';
+import { NOTE_KINDS, validateTemplate, type NoteKind, type NoteTemplateDef, type TemplateCardType, type TemplateField } from '../../shared/notes.ts';
 import type { BackupStatus, RestorePreview, SnapshotInfo } from '../../shared/types.ts';
 import { APP_VERSION } from '../config.ts';
 import { nowIso, type Ctx } from '../context.ts';
@@ -13,7 +14,9 @@ import { LATEST_SCHEMA_VERSION, MIGRATIONS } from '../db/migrations.ts';
 import { AppError, badRequest, newId, parseJson, placeholders } from '../lib/util.ts';
 import { assertParentUsable, getRow } from './hierarchy.ts';
 import { detectImageType, MAX_MEDIA_BYTES, MEDIA_FILENAME_RE, referencedMedia } from './media.ts';
+import { getNoteRow, parseFields, renderOrThrow, syncNoteCards } from './notes.ts';
 import { getMeta, getSettings, setMeta } from './settings.ts';
+import { getTemplateDef } from './templates.ts';
 
 export const BACKUP_FORMAT = 'recall-backup';
 export const BACKUP_FORMAT_VERSION = 1;
@@ -24,6 +27,8 @@ export const FULL_TABLES = [
   'semesters',
   'courses',
   'sections',
+  'note_templates',
+  'notes',
   'cards',
   'tags',
   'card_tags',
@@ -66,13 +71,42 @@ const MAX_RATIO = 2000;
 
 function readTables(db: DB, tables: readonly TableName[], filter?: Partial<Record<TableName, { sql: string; params: unknown[] }>>): BackupData {
   const out: BackupData = { tables: {} };
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?");
   for (const t of tables) {
+    if (!exists.get(t)) continue; // older snapshots lack tables added by later migrations
     const f = filter?.[t];
     out.tables[t] = (f ? db.prepare(f.sql).all(...f.params) : db.prepare(`SELECT * FROM ${t}`).all()) as Row[];
   }
   // Local status entries are machine-specific and never exported.
   if (out.tables.settings) out.tables.settings = out.tables.settings.filter((r) => !String(r.key).startsWith('meta:'));
   return out;
+}
+
+/**
+ * Bring data from an older schema up to the current one before validation.
+ * Schema 3 introduced notes: every older card becomes a basic note with the same id,
+ * exactly like the database migration does.
+ */
+export function upgradeBackupData(data: BackupData, schemaVersion: number): BackupData {
+  if (schemaVersion >= 3) return data;
+  const cards = data.tables.cards ?? [];
+  data.tables.note_templates = data.tables.note_templates ?? [];
+  data.tables.notes = cards.map((c) => ({
+    id: c.id,
+    section_id: c.section_id,
+    kind: 'basic',
+    template_id: null,
+    fields_json: JSON.stringify({ front: c.front ?? '', back: c.back ?? '', explanation: c.explanation ?? '', hint: c.hint ?? '', source: c.source ?? '' }),
+    options_json: '{}',
+    position: c.position ?? 0,
+    revision: c.revision ?? 1,
+    is_demo: c.is_demo ?? 0,
+    deleted_at: c.deleted_at ?? null,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+  }));
+  data.tables.cards = cards.map((c) => ({ ...c, note_id: c.id }));
+  return data;
 }
 
 function mediaFiles(ctx: Ctx, filenames: string[]): { zip: Zippable; list: Manifest['media']; missing: string[] } {
@@ -137,10 +171,13 @@ export function exportFull(ctx: Ctx): { filename: string; buffer: Buffer } {
 export function exportCourse(ctx: Ctx, courseId: string): { filename: string; buffer: Buffer } {
   const course = getRow<{ title: string }>(ctx, 'course', courseId);
   const cardsIn = `SELECT id FROM cards WHERE deleted_at IS NULL AND section_id IN (SELECT id FROM sections WHERE course_id = ? AND deleted_at IS NULL)`;
+  const notesIn = `SELECT id FROM notes WHERE deleted_at IS NULL AND section_id IN (SELECT id FROM sections WHERE course_id = ? AND deleted_at IS NULL)`;
   const data = ctx.db.transaction(() =>
-    readTables(ctx.db, ['courses', 'sections', 'cards', 'tags', 'card_tags', 'card_schedules', 'media_assets'], {
+    readTables(ctx.db, ['courses', 'sections', 'note_templates', 'notes', 'cards', 'tags', 'card_tags', 'card_schedules', 'media_assets'], {
       courses: { sql: 'SELECT * FROM courses WHERE id = ?', params: [courseId] },
       sections: { sql: 'SELECT * FROM sections WHERE course_id = ? AND deleted_at IS NULL', params: [courseId] },
+      notes: { sql: `SELECT * FROM notes WHERE id IN (${notesIn})`, params: [courseId] },
+      note_templates: { sql: `SELECT * FROM note_templates WHERE id IN (SELECT template_id FROM notes WHERE id IN (${notesIn}))`, params: [courseId] },
       cards: { sql: `SELECT * FROM cards WHERE id IN (${cardsIn})`, params: [courseId] },
       card_tags: { sql: `SELECT * FROM card_tags WHERE card_id IN (${cardsIn})`, params: [courseId] },
       tags: { sql: `SELECT * FROM tags WHERE id IN (SELECT tag_id FROM card_tags WHERE card_id IN (${cardsIn}))`, params: [courseId] },
@@ -167,7 +204,8 @@ export function exportCourse(ctx: Ctx, courseId: string): { filename: string; bu
     counts: countsOf(data),
     includes: [
       `Course “${course.title}” with its sections (archived sections included, trash excluded)`,
-      'Cards, tags and the images they reference',
+      'Notes and their cards (basic, reverse, cloze, image occlusion and template cards), tags and the images they reference',
+      'The card templates those notes use',
       'Card schedules (due dates, intervals, lapse counts) — optional on import',
     ],
     excludes: ['Review history and study sessions', 'App settings', 'Other courses, semesters and programs'],
@@ -264,7 +302,7 @@ export function readArchive(buf: Buffer): ParsedArchive {
     if (!type || !filename.endsWith(`.${type.ext}`)) throw badRequest(`Media file ${filename} is not the image type its name says`);
     media.set(filename, content);
   }
-  return { manifest, data, media };
+  return { manifest, data: upgradeBackupData(data, manifest.schemaVersion), media };
 }
 
 // ---------- Validation via scratch database ----------
@@ -369,7 +407,7 @@ function readSnapshotData(file: string): { data: BackupData; schemaVersion: numb
   try {
     const v = (db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get() as { v: number }).v;
     if (v > LATEST_SCHEMA_VERSION) throw badRequest('This snapshot was made by a newer version of Recall');
-    return { data: readTables(db, FULL_TABLES), schemaVersion: v };
+    return { data: upgradeBackupData(readTables(db, FULL_TABLES), v), schemaVersion: v };
   } finally {
     db.close();
   }
@@ -477,7 +515,7 @@ export async function applyFullRestore(ctx: Ctx, token: string): Promise<{ preRe
 // ---------- Course packages ----------
 
 function validateCoursePackage(data: BackupData, media: Map<string, Uint8Array>): string[] {
-  const allowed = ['courses', 'sections', 'cards', 'tags', 'card_tags', 'card_schedules', 'media_assets'] as const;
+  const allowed = ['courses', 'sections', 'note_templates', 'notes', 'cards', 'tags', 'card_tags', 'card_schedules', 'media_assets'] as const;
   const scratch = createScratch();
   try {
     validateRows(scratch, data, allowed as unknown as readonly TableName[]);
@@ -487,12 +525,30 @@ function validateCoursePackage(data: BackupData, media: Map<string, Uint8Array>)
   if ((data.tables.courses ?? []).length !== 1) throw badRequest('A course package must contain exactly one course');
   const warnings: string[] = [];
   const sectionIds = new Set((data.tables.sections ?? []).map((s) => String(s.id)));
+  const noteIds = new Set((data.tables.notes ?? []).map((n) => String(n.id)));
+  for (const n of data.tables.notes ?? []) {
+    if (!sectionIds.has(String(n.section_id))) throw badRequest('A note in the package refers to a missing section');
+    if (!NOTE_KINDS.includes(n.kind as NoteKind)) throw badRequest('A note in the package has an unknown card type');
+  }
   for (const c of data.tables.cards ?? []) {
-    if (!sectionIds.has(String(c.section_id))) throw badRequest('A card in the package refers to a missing section');
-    if (typeof c.front !== 'string' || typeof c.back !== 'string') throw badRequest('A card in the package is missing its front or back');
+    if (!noteIds.has(String(c.note_id))) throw badRequest('A card in the package refers to a missing note');
+  }
+  for (const t of data.tables.note_templates ?? []) {
+    const issues = validateTemplate(templateDefOf(t));
+    if (issues.length) throw badRequest(`Template “${String(t.name ?? '')}” in the package is invalid: ${issues[0].message}`);
   }
   for (const m of data.tables.media_assets ?? []) if (!media.has(String(m.filename))) warnings.push(`Image ${m.filename} is missing from the package`);
   return warnings;
+}
+
+function templateDefOf(row: Row): NoteTemplateDef {
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ''),
+    fields: parseJson<TemplateField[]>(String(row.fields_json ?? '[]'), []),
+    cards: parseJson<TemplateCardType[]>(String(row.cards_json ?? '[]'), []),
+    revision: Number(row.revision ?? 1),
+  };
 }
 
 /** Package values are untrusted: anything outside the app's own vocabulary falls back to a default. */
@@ -547,13 +603,47 @@ export function importCoursePackage(ctx: Ctx, token: string, opts: { semesterId:
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(id, courseId, String(s.title ?? 'Section'), oneOf(SECTION_KIND_VALUES, s.kind, 'lecture'), s.week_number ?? null, dateOrNull(s.date), String(s.notes ?? ''), Number(s.position ?? 0), s.archived_at ?? null, ts, ts);
     }
+    // Templates: reuse one that already exists here (same id), otherwise add it.
+    for (const tpl of data.tables.note_templates ?? []) {
+      const exists = db.prepare('SELECT 1 FROM note_templates WHERE id = ?').get(String(tpl.id));
+      if (exists) continue;
+      const def = templateDefOf(tpl);
+      db.prepare('INSERT INTO note_templates (id, name, fields_json, cards_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+        def.id, def.name, JSON.stringify(def.fields), JSON.stringify(def.cards), ts, ts,
+      );
+    }
+    // Notes are untrusted: re-render each one with the same rules as the editor and
+    // generate fresh cards, then map the package's card ids by (note, variant).
+    const pkgCardsByNote = new Map<string, Row[]>();
     for (const c of data.tables.cards ?? []) {
-      const id = newId(t);
-      cardMap.set(String(c.id), id);
+      const list = pkgCardsByNote.get(String(c.note_id)) ?? [];
+      list.push(c);
+      pkgCardsByNote.set(String(c.note_id), list);
+    }
+    for (const n of data.tables.notes ?? []) {
+      const kind = n.kind as NoteKind;
+      const sectionId = sectionMap.get(String(n.section_id))!;
+      const template = kind === 'template' ? getTemplateDef(ctx, String(n.template_id)) : null;
+      let fields;
+      try {
+        fields = parseFields(kind, parseJson(String(n.fields_json ?? '{}'), {}));
+      } catch (e) {
+        throw badRequest(`A note in the package is invalid: ${(e as Error).message}`);
+      }
+      const options = parseJson(String(n.options_json ?? '{}'), {});
+      const rendered = renderOrThrow(kind, fields, options, template);
+      const nid = newId(t);
       db.prepare(
-        `INSERT INTO cards (id, section_id, front, back, explanation, hint, source, bookmarked, suspended_at, position, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(id, sectionMap.get(String(c.section_id)), String(c.front), String(c.back), String(c.explanation ?? ''), String(c.hint ?? ''), String(c.source ?? ''), Number(c.bookmarked ?? 0) ? 1 : 0, c.suspended_at ?? null, Number(c.position ?? 0), ts, ts);
+        `INSERT INTO notes (id, section_id, kind, template_id, fields_json, options_json, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(nid, sectionId, kind, template ? template.id : null, JSON.stringify(fields), JSON.stringify(options), Number(n.position ?? 0), ts, ts);
+      syncNoteCards(ctx, getNoteRow(ctx, nid), rendered, { tags: [] });
+      for (const c of pkgCardsByNote.get(String(n.id)) ?? []) {
+        const created = db.prepare('SELECT id FROM cards WHERE note_id = ? AND variant = ?').get(nid, String(c.variant ?? 'main')) as { id: string } | undefined;
+        if (!created) continue;
+        cardMap.set(String(c.id), created.id);
+        db.prepare('UPDATE cards SET bookmarked = ?, suspended_at = ? WHERE id = ?').run(Number(c.bookmarked ?? 0) ? 1 : 0, typeof c.suspended_at === 'string' ? c.suspended_at : null, created.id);
+      }
     }
     const tagName = new Map((data.tables.tags ?? []).map((tg) => [String(tg.id), String(tg.name)]));
     for (const ct of data.tables.card_tags ?? []) {

@@ -12,6 +12,8 @@ import * as csv from './services/csv.ts';
 import * as demo from './services/demo.ts';
 import * as drafts from './services/drafts.ts';
 import * as h from './services/hierarchy.ts';
+import * as notes from './services/notes.ts';
+import * as templates from './services/templates.ts';
 import { MAX_MEDIA_BYTES, saveMedia } from './services/media.ts';
 import * as sessions from './services/sessions.ts';
 import { getSettings, updateSettings } from './services/settings.ts';
@@ -135,10 +137,10 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     return cards.createCard(ctx, body(req));
   });
   post('/api/cards/reorder', (req) => cards.reorderCards(ctx, body(req)));
-  get('/api/cards/:id', (req) => ({
-    card: cards.getCard(ctx, req.params.id),
-    breadcrumbs: h.breadcrumbs(ctx, 'section', cards.getCard(ctx, req.params.id).sectionId),
-  }));
+  get('/api/cards/:id', (req) => {
+    const { card, note } = cards.getCardWithNote(ctx, req.params.id);
+    return { card, note, breadcrumbs: h.breadcrumbs(ctx, 'section', card.sectionId) };
+  });
   patch('/api/cards/:id', (req) => cards.updateCard(ctx, req.params.id, body(req)));
   post('/api/cards/:id/duplicate', (req, reply) => {
     reply.code(201);
@@ -146,6 +148,33 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
   });
   post('/api/cards/bulk', (req) => cards.bulkCards(ctx, body(req)));
   get('/api/tags', () => cards.listTags(ctx));
+
+  // ----- Notes (the written content behind one or more cards) -----
+  const saved = (r: { note: { id: string }; sync: notes.SyncResult }) => ({ note: r.note, primaryCardId: notes.primaryCardId(ctx, r.note.id), sync: r.sync });
+  post('/api/notes', (req, reply) => {
+    reply.code(201);
+    return saved(notes.createNote(ctx, body(req)));
+  });
+  get('/api/notes/:id', (req) => notes.getNote(ctx, req.params.id));
+  patch('/api/notes/:id', (req) => saved(notes.updateNote(ctx, req.params.id, body(req))));
+  post('/api/notes/:id/duplicate', (req, reply) => {
+    reply.code(201);
+    const note = notes.duplicateNote(ctx, req.params.id);
+    return { note, primaryCardId: notes.primaryCardId(ctx, note.id), sync: { created: note.cards.length, updated: 0, retired: 0, restored: 0 } };
+  });
+
+  // ----- Card templates -----
+  get('/api/templates', (req) => templates.listTemplates(ctx, { includeArchived: req.query.includeArchived === '1' }));
+  post('/api/templates', (req, reply) => {
+    reply.code(201);
+    return templates.createTemplate(ctx, body(req));
+  });
+  get('/api/templates/:id', (req) => templates.getTemplate(ctx, req.params.id));
+  patch('/api/templates/:id', (req) => templates.updateTemplate(ctx, req.params.id, body(req), { dryRun: req.query.dryRun === '1' }));
+  del('/api/templates/:id', (req) => {
+    templates.deleteTemplate(ctx, req.params.id);
+    return { ok: true };
+  });
 
   // ----- Drafts -----
   get('/api/drafts/:key', (req) => drafts.getDraft(ctx, req.params.key));

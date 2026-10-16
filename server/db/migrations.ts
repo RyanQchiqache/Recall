@@ -257,6 +257,60 @@ ALTER TABLE courses ADD COLUMN exam_set_at TEXT;
 UPDATE courses SET exam_set_at = updated_at WHERE exam_date IS NOT NULL;
 `,
   },
+  {
+    version: 3,
+    name: 'notes, card types and templates',
+    sql: `
+CREATE TABLE note_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  fields_json TEXT NOT NULL,
+  cards_json TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1,
+  is_demo INTEGER NOT NULL DEFAULT 0,
+  archived_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE notes (
+  id TEXT PRIMARY KEY,
+  section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('basic', 'cloze', 'occlusion', 'template')),
+  template_id TEXT REFERENCES note_templates(id) ON DELETE RESTRICT,
+  fields_json TEXT NOT NULL,
+  options_json TEXT NOT NULL DEFAULT '{}',
+  position INTEGER NOT NULL DEFAULT 0,
+  revision INTEGER NOT NULL DEFAULT 1,
+  is_demo INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK ((kind = 'template') = (template_id IS NOT NULL))
+);
+CREATE INDEX idx_notes_section ON notes(section_id, position);
+CREATE INDEX idx_notes_template ON notes(template_id);
+
+-- Every existing card becomes a basic note with the same id, so no history moves.
+INSERT INTO notes (id, section_id, kind, template_id, fields_json, options_json, position, revision, is_demo, deleted_at, created_at, updated_at)
+SELECT id, section_id, 'basic', NULL,
+  json_object('front', front, 'back', back, 'explanation', explanation, 'hint', hint, 'source', source),
+  '{}', position, revision, is_demo, deleted_at, created_at, updated_at
+FROM cards;
+
+ALTER TABLE cards ADD COLUMN note_id TEXT REFERENCES notes(id) ON DELETE CASCADE;
+ALTER TABLE cards ADD COLUMN variant TEXT NOT NULL DEFAULT 'main';
+ALTER TABLE cards ADD COLUMN variant_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE cards ADD COLUMN variant_label TEXT NOT NULL DEFAULT '';
+ALTER TABLE cards ADD COLUMN render_json TEXT NOT NULL DEFAULT '{"type":"markdown"}';
+-- A retired card belongs to a gap, box or card type the note no longer has. It is hidden
+-- (deleted_at is set too) but keeps its history, and comes back if the variant returns.
+ALTER TABLE cards ADD COLUMN retired_at TEXT;
+UPDATE cards SET note_id = id;
+CREATE INDEX idx_cards_note ON cards(note_id, variant_order);
+CREATE UNIQUE INDEX idx_cards_note_variant ON cards(note_id, variant);
+`,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

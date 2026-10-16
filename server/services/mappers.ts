@@ -1,3 +1,4 @@
+import type { NoteKind } from '../../shared/notes.ts';
 import type { Rating, StudyMode } from '../../shared/ratings.ts';
 import type {
   Card,
@@ -58,6 +59,12 @@ export interface CardRow {
   is_demo: number;
   created_at: string;
   updated_at: string;
+  note_id: string;
+  variant: string;
+  variant_order: number;
+  variant_label: string;
+  render_json: string;
+  retired_at: string | null;
 }
 export interface ScheduleRow {
   card_id: string;
@@ -150,6 +157,9 @@ export interface CardListRow extends CardRow {
   last_any_rating: number | null;
   last_any_mode: string | null;
   tag_list: string | null;
+  note_kind: string;
+  note_revision: number;
+  sibling_count: number;
 }
 
 export function cardStatus(suspended: boolean, dueDate: string | null, today: string): CardStatus {
@@ -184,7 +194,8 @@ export function toCard(r: CardListRow, today: string): Card {
     bookmarked: r.bookmarked === 1,
     suspendedAt: r.suspended_at,
     position: r.position,
-    revision: r.revision,
+    // Editing happens on the note, so the edit revision is the note's.
+    revision: r.note_revision,
     isDemo: r.is_demo === 1,
     tags: r.tag_list ? r.tag_list.split('\u001f').sort((a, b) => a.localeCompare(b)) : [],
     createdAt: r.created_at,
@@ -195,6 +206,11 @@ export function toCard(r: CardListRow, today: string): Card {
     lastRatingMode: (r.last_any_mode ?? null) as StudyMode | null,
     sectionTitle: r.section_title,
     courseTitle: r.course_title,
+    noteId: r.note_id,
+    kind: r.note_kind as NoteKind,
+    variant: r.variant,
+    variantLabel: r.variant_label,
+    siblingCount: r.sibling_count,
   };
 }
 
@@ -202,7 +218,10 @@ export function toCard(r: CardListRow, today: string): Card {
 export const CARD_SELECT = `
   c.id, c.section_id, c.front, c.back, c.explanation, c.hint, c.source, c.bookmarked,
   c.suspended_at, c.deleted_at, c.position, c.revision, c.is_demo, c.created_at, c.updated_at,
-  c.course_id,
+  c.course_id, c.note_id, c.variant, c.variant_order, c.variant_label, c.render_json, c.retired_at,
+  (SELECT kind FROM notes WHERE id = c.note_id) AS note_kind,
+  (SELECT revision FROM notes WHERE id = c.note_id) AS note_revision,
+  (SELECT COUNT(*) FROM cards x WHERE x.note_id = c.note_id AND x.deleted_at IS NULL) AS sibling_count,
   (SELECT title FROM sections WHERE id = c.section_id) AS section_title,
   (SELECT title FROM courses WHERE id = c.course_id) AS course_title,
   cs.due_date AS s_due_date, cs.interval_days AS s_interval_days, cs.review_count AS s_review_count,

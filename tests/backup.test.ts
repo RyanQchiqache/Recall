@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { strToU8, unzipSync, zipSync } from 'fflate';
 import { afterEach, describe, expect, it } from 'vitest';
+import { LATEST_SCHEMA_VERSION } from '../server/db/migrations.ts';
 import { Canvas } from '../server/lib/png.ts';
 import { makeApp, revealAndRate, seedHierarchy, sessionRequest, type TestApp } from './helpers.ts';
 
@@ -49,7 +50,7 @@ describe('full backup round trip', () => {
     const files = unzipSync(new Uint8Array(exp.buffer));
     expect(Object.keys(files)).toEqual(expect.arrayContaining(['manifest.json', 'data.json', `media/${media.filename}`]));
     const manifest = JSON.parse(new TextDecoder().decode(files['manifest.json']));
-    expect(manifest).toMatchObject({ format: 'recall-backup', formatVersion: 1, kind: 'full', schemaVersion: 2 });
+    expect(manifest).toMatchObject({ format: 'recall-backup', formatVersion: 1, kind: 'full', schemaVersion: LATEST_SCHEMA_VERSION });
 
     const b = await app();
     const prev = await b.upload('/api/restore/preview', 'backup.zip', exp.buffer, 'application/zip');
@@ -59,7 +60,7 @@ describe('full backup round trip', () => {
     expect(applied.status).toBe(200);
     expect(applied.body.preRestoreSnapshot).toMatch(/^pre-restore-/);
 
-    const tables = ['programs', 'semesters', 'courses', 'sections', 'cards', 'tags', 'card_tags', 'media_assets', 'card_schedules', 'study_sessions', 'session_cards', 'review_events'];
+    const tables = ['programs', 'semesters', 'courses', 'sections', 'note_templates', 'notes', 'cards', 'tags', 'card_tags', 'media_assets', 'card_schedules', 'study_sessions', 'session_cards', 'review_events'];
     for (const t of tables) {
       expect(b.ctx.db.prepare(`SELECT * FROM ${t} ORDER BY 1, 2`).all()).toEqual(a.ctx.db.prepare(`SELECT * FROM ${t} ORDER BY 1, 2`).all());
     }
