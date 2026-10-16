@@ -1,11 +1,20 @@
 import { Bold, Code2, Heading2, ImagePlus, Italic, List, ListOrdered, Quote, Radical, SquareCode, SquareSigma } from 'lucide-react';
 import { forwardRef, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
+import { nextClozeNumber } from '../../shared/notes.ts';
 import type { MediaAsset } from '../../shared/types.ts';
 import { api, errorMessage } from '../lib/api.ts';
 import { cn, useLatest } from '../lib/util.ts';
 import { Spinner } from './ui/Feedback.tsx';
 import { fieldClass } from './ui/Form.tsx';
 import { Tip } from './ui/Tooltip.tsx';
+
+function BracesIcon() {
+  return (
+    <span className="font-mono text-[11px] leading-none font-bold" aria-hidden>
+      [..]
+    </span>
+  );
+}
 
 export interface MarkdownEditorHandle {
   focus: () => void;
@@ -25,8 +34,10 @@ export const MarkdownEditor = forwardRef<
     invalid?: boolean;
     describedBy?: string;
     onError: (msg: string) => void;
+    /** Show the “Make cloze” tool and its shortcuts (⌘⇧C new gap, ⌘⌥⇧C same number). */
+    cloze?: boolean;
   }
->(function MarkdownEditor({ id, value, onChange, label, placeholder, minRows = 5, invalid, describedBy, onError }, ref) {
+>(function MarkdownEditor({ id, value, onChange, label, placeholder, minRows = 5, invalid, describedBy, onError, cloze }, ref) {
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
@@ -91,7 +102,16 @@ export const MarkdownEditor = forwardRef<
     }
   };
 
+  /** Wrap the selection as a cloze gap: a new number, or the last one used (to ask several gaps together). */
+  const makeCloze = (sameNumber: boolean) => {
+    const current = latest.current;
+    const next = nextClozeNumber(current);
+    const n = sameNumber ? Math.max(1, next - 1) : next;
+    wrap(`{{c${n}::`, '}}', 'answer');
+  };
+
   const tools: { label: string; icon: ReactNode; run: () => void; shortcut?: string }[] = [
+    ...(cloze ? [{ label: 'Make cloze (new gap)', icon: <BracesIcon />, run: () => makeCloze(false), shortcut: '⌘⇧C' }] : []),
     { label: 'Bold', icon: <Bold />, run: () => wrap('**'), shortcut: '⌘B' },
     { label: 'Italic', icon: <Italic />, run: () => wrap('*'), shortcut: '⌘I' },
     { label: 'Heading', icon: <Heading2 />, run: () => prefixLines(() => '### ') },
@@ -149,6 +169,11 @@ export const MarkdownEditor = forwardRef<
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
             const mod = e.metaKey || e.ctrlKey;
+            if (cloze && mod && e.shiftKey && e.code === 'KeyC') {
+              e.preventDefault();
+              makeCloze(e.altKey);
+              return;
+            }
             if (mod && !e.shiftKey && e.key.toLowerCase() === 'b') {
               e.preventDefault();
               wrap('**');

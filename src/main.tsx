@@ -28,6 +28,7 @@ import { SettingsPage } from './pages/SettingsPage.tsx';
 import { StatsPage } from './pages/StatsPage.tsx';
 import { StudyScreen } from './pages/StudyScreen.tsx';
 import { TrashPage } from './pages/TrashPage.tsx';
+import { TemplateEditorPage, TemplatesPage } from './pages/TemplatesPage.tsx';
 
 // Apply the cached preference before first paint to avoid a flash.
 applyTheme(cachedPreference());
@@ -113,6 +114,9 @@ const router = createBrowserRouter([
           { path: '/settings', element: <SettingsPage /> },
           { path: '/help', element: <HelpPage /> },
           { path: '/trash', element: <TrashPage /> },
+          { path: '/templates', element: <TemplatesPage /> },
+          { path: '/templates/new', element: <TemplateEditorPage /> },
+          { path: '/templates/:id', element: <KeyedById page={TemplateEditorPage} /> },
           { path: '*', element: <NotFound /> },
         ],
       },

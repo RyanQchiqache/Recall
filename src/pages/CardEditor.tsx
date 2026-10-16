@@ -1,39 +1,90 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bookmark, ChevronDown, Copy, Lightbulb, Pause, Play, Save, Trash2 } from 'lucide-react';
+import { Bookmark, Brackets, ChevronDown, Copy, FileText, ImageIcon, LayoutTemplate, Lightbulb, Pause, Play, Save, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
-import type { Card, Crumb, Section } from '../../shared/types.ts';
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
+import {
+  emptyFields,
+  NOTE_KIND_LABEL,
+  NOTE_KINDS,
+  noteProblems,
+  noteTitle,
+  renderNote,
+  type BasicFields,
+  type ClozeFields,
+  type NoteFields,
+  type NoteKind,
+  type NoteOptions,
+  type NoteTemplateDef,
+  type OcclusionFields,
+  type RenderedCard,
+  type TemplateFields,
+} from '../../shared/notes.ts';
+import type { Card, Crumb, Note, NoteSaveResult, Section } from '../../shared/types.ts';
+import { CardFace } from '../components/CardFace.tsx';
 import { SectionPicker, StatusBadge } from '../components/CardList.tsx';
 import { useHierarchy } from '../components/HierarchyDialogs.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { MarkdownEditor, type MarkdownEditorHandle } from '../components/MarkdownEditor.tsx';
+import { OcclusionEditor } from '../components/OcclusionEditor.tsx';
 import { Breadcrumbs, PageHeader } from '../components/layout/AppShell.tsx';
 import { TagInput } from '../components/TagInput.tsx';
 import { Button } from '../components/ui/Button.tsx';
 import { Modal } from '../components/ui/Dialog.tsx';
-import { Alert, ErrorState, Kbd, PageLoader, Panel } from '../components/ui/Feedback.tsx';
-import { Checkbox, Field, Input } from '../components/ui/Form.tsx';
+import { Alert, Badge, ErrorState, Kbd, PageLoader, Panel } from '../components/ui/Feedback.tsx';
+import { Checkbox, Field, Input, Segmented, Select, Switch } from '../components/ui/Form.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { ApiError, api, errorMessage } from '../lib/api.ts';
-import { formatDate, formatDateTime, plural } from '../lib/format.ts';
-import { invalidateContent, queryClient, useCard, useDashboard } from '../lib/queries.ts';
+import { formatDate, formatDateTime, mdPreview, plural, relativeDay } from '../lib/format.ts';
+import { invalidateContent, queryClient, useCard, useDashboard, useTemplates } from '../lib/queries.ts';
 import { cn, dialogOpen } from '../lib/util.ts';
 
 interface Form {
   sectionId: string;
-  front: string;
-  back: string;
-  explanation: string;
-  hint: string;
-  source: string;
+  kind: NoteKind;
+  templateId: string | null;
+  fields: NoteFields;
+  options: NoteOptions;
   tags: string[];
   bookmarked: boolean;
 }
 
-const EMPTY: Omit<Form, 'sectionId'> = { front: '', back: '', explanation: '', hint: '', source: '', tags: [], bookmarked: false };
+const KIND_ICON: Record<NoteKind, typeof FileText> = { basic: FileText, cloze: Brackets, occlusion: ImageIcon, template: LayoutTemplate };
+const KIND_HELP: Record<NoteKind, string> = {
+  basic: 'A question and its answer. Optionally also ask it the other way round.',
+  cloze: 'Text with gaps. Each gap number becomes its own card.',
+  occlusion: 'An image with boxes over parts to name. Each box becomes its own card.',
+  template: 'Your own fields and card layouts, reused for many notes.',
+};
 
-function fromCard(c: Card): Form {
-  return { sectionId: c.sectionId, front: c.front, back: c.back, explanation: c.explanation, hint: c.hint, source: c.source, tags: c.tags, bookmarked: c.bookmarked };
+function fromNote(n: Note): Form {
+  return { sectionId: n.sectionId, kind: n.kind, templateId: n.templateId, fields: n.fields, options: n.options, tags: n.tags, bookmarked: n.bookmarked };
+}
+
+function emptyForm(kind: NoteKind, sectionId: string, templateId: string | null = null): Form {
+  return { sectionId, kind, templateId, fields: emptyFields(kind), options: kind === 'occlusion' ? { occlusionMode: 'hide-all' } : {}, tags: [], bookmarked: false };
+}
+
+/** Restore a draft, including ones saved before card types existed (plain front/back). */
+function formFromDraft(base: Form, payload: Record<string, unknown>, fixedKind: boolean): Form {
+  if (payload.fields && typeof payload.fields === 'object') {
+    const kind = fixedKind ? base.kind : NOTE_KINDS.includes(payload.kind as NoteKind) ? (payload.kind as NoteKind) : base.kind;
+    if (fixedKind && payload.kind !== base.kind) return base;
+    return {
+      ...base,
+      kind,
+      sectionId: typeof payload.sectionId === 'string' ? payload.sectionId : base.sectionId,
+      templateId: typeof payload.templateId === 'string' ? payload.templateId : base.templateId,
+      fields: { ...emptyFields(kind), ...(payload.fields as object) } as NoteFields,
+      options: (payload.options as NoteOptions) ?? base.options,
+      tags: Array.isArray(payload.tags) ? (payload.tags as string[]) : base.tags,
+      bookmarked: typeof payload.bookmarked === 'boolean' ? payload.bookmarked : base.bookmarked,
+    };
+  }
+  if (typeof payload.front === 'string' && base.kind === 'basic') {
+    const p = payload as Record<string, string>;
+    return { ...base, fields: { ...(base.fields as BasicFields), front: p.front ?? '', back: p.back ?? '', explanation: p.explanation ?? '', hint: p.hint ?? '', source: p.source ?? '' }, tags: Array.isArray(payload.tags) ? (payload.tags as string[]) : base.tags };
+  }
+  return base;
 }
 
 const same = (a: Form, b: Form) => JSON.stringify(a) === JSON.stringify(b);
@@ -44,29 +95,71 @@ export function CardEditor() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const sectionParam = params.get('section') ?? '';
+  const kindParam = params.get('kind') as NoteKind | null;
   const card = useCard(id);
   if (id && card.isLoading) return <PageLoader />;
   if (id && card.error) return <ErrorState error={card.error} onRetry={() => card.refetch()} />;
   // Remount the inner editor whenever the target changes so state never leaks between cards.
-  return <EditorInner key={id ?? `new:${sectionParam}`} card={card.data?.card ?? null} crumbs={card.data?.breadcrumbs} initialSection={sectionParam} first={params.get('first') === '1'} />;
+  return (
+    <EditorInner
+      key={id ?? `new:${sectionParam}`}
+      card={card.data?.card ?? null}
+      note={card.data?.note ?? null}
+      crumbs={card.data?.breadcrumbs}
+      initialSection={sectionParam}
+      initialKind={kindParam && NOTE_KINDS.includes(kindParam) ? kindParam : 'basic'}
+      initialTemplate={params.get('template')}
+      first={params.get('first') === '1'}
+    />
+  );
 }
 
-function EditorInner({ card, crumbs, initialSection, first }: { card: Card | null; crumbs?: Crumb[]; initialSection: string; first: boolean }) {
-  const isNew = !card;
+function syncMessage(sync: NoteSaveResult['sync'], isNew: boolean): string {
+  if (isNew) return sync.created === 1 ? 'Card created' : `${sync.created} cards created`;
+  const parts = [
+    sync.created && plural(sync.created, 'new card'),
+    sync.restored && `${plural(sync.restored, 'card')} back with its history`,
+    sync.retired && `${plural(sync.retired, 'card')} set aside (history kept)`,
+  ].filter(Boolean);
+  return parts.length ? `Saved · ${parts.join(' · ')}` : 'Card saved';
+}
+
+function EditorInner({
+  card,
+  note,
+  crumbs,
+  initialSection,
+  initialKind,
+  initialTemplate,
+  first,
+}: {
+  card: Card | null;
+  note: Note | null;
+  crumbs?: Crumb[];
+  initialSection: string;
+  initialKind: NoteKind;
+  initialTemplate: string | null;
+  first: boolean;
+}) {
+  const isNew = !note;
   const navigate = useNavigate();
   const toast = useToast();
   const h = useHierarchy();
   const dash = useDashboard();
-  const baseline = useRef<Form>(card ? fromCard(card) : { ...EMPTY, sectionId: initialSection });
+  // Archived templates still render existing notes; only the new-note picker hides them.
+  const templates = useTemplates(true);
+  const pickable = templates.data?.filter((t) => !t.archivedAt) ?? [];
+  const baseline = useRef<Form>(note ? fromNote(note) : emptyForm(initialKind, initialSection, initialKind === 'template' ? initialTemplate : null));
   const [form, setForm] = useState<Form>(baseline.current);
-  const [revision, setRevision] = useState(card?.revision ?? 0);
-  const [errors, setErrors] = useState<{ front?: string; back?: string; section?: string; general?: string }>({});
+  const [revision, setRevision] = useState(note?.revision ?? 0);
+  const [errors, setErrors] = useState<{ fields?: string; section?: string; general?: string }>({});
   const [saving, setSaving] = useState(false);
   const [draftState, setDraftState] = useState<DraftState>('idle');
   const [restored, setRestored] = useState<string | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(() => !!(card && (card.explanation || card.hint || card.source || card.tags.length)));
-  const [conflict, setConflict] = useState<Card | null>(null);
-  const frontRef = useRef<MarkdownEditorHandle>(null);
+  const [detailsOpen, setDetailsOpen] = useState(() => !!(note && (note.fields.explanation || note.fields.hint || note.fields.source || note.tags.length)));
+  const [conflict, setConflict] = useState<Note | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const firstRef = useRef<MarkdownEditorHandle>(null);
   // One draft key per editor session: switching the section of a new card must not orphan the draft.
   const liveKey = card ? `card:${card.id}` : form.sectionId ? `new:${form.sectionId}` : null;
   const [draftKeyAtLoad] = useState(liveKey);
@@ -81,6 +174,18 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   const dirty = !same(form, baseline.current);
   const justSaved = useRef(false);
 
+  const template: NoteTemplateDef | null = useMemo(
+    () => (form.kind === 'template' ? (templates.data?.find((t) => t.id === form.templateId) ?? null) : null),
+    [form.kind, form.templateId, templates.data],
+  );
+  // A new template note defaults to the first template.
+  useEffect(() => {
+    if (isNew && form.kind === 'template' && !form.templateId && pickable.length) {
+      setForm((f) => ({ ...f, templateId: pickable[0].id }));
+      baseline.current = { ...baseline.current, templateId: pickable[0].id };
+    }
+  }, [isNew, form.kind, form.templateId, pickable]);
+
   const sectionQuery = useQuery({
     queryKey: ['section', form.sectionId],
     queryFn: () => api.get<{ item: Section; breadcrumbs: Crumb[] }>(`/api/sections/${form.sectionId}`),
@@ -92,27 +197,27 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
     if (!draftKeyAtLoad) return;
     let cancelled = false;
     api
-      .get<{ payload: Partial<Form> & { baseRevision?: number }; updatedAt: string } | null>(`/api/drafts/${draftKeyAtLoad}`)
+      .get<{ payload: Record<string, unknown> & { baseRevision?: number }; updatedAt: string } | null>(`/api/drafts/${draftKeyAtLoad}`)
       .then((d) => {
         if (cancelled || !d?.payload) return;
         const { baseRevision, ...rest } = d.payload;
-        const merged: Form = { ...baseline.current, ...rest, tags: Array.isArray(rest.tags) ? rest.tags : baseline.current.tags };
+        const merged = formFromDraft(baseline.current, rest, !isNew);
         if (!same(merged, baseline.current)) {
           setForm(merged);
           setRestored(d.updatedAt);
-          if (card && typeof baseRevision === 'number' && baseRevision !== card.revision) {
-            // The card changed after this draft was written: saving will ask which version to keep.
+          if (note && typeof baseRevision === 'number' && baseRevision !== note.revision) {
+            // The note changed after this draft was written: saving will ask which version to keep.
             setRevision(baseRevision);
             setStaleDraft(true);
           }
-          if (merged.explanation || merged.hint || merged.source || merged.tags.length) setDetailsOpen(true);
+          if (merged.fields.explanation || merged.fields.hint || merged.fields.source || merged.tags.length) setDetailsOpen(true);
         }
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [draftKeyAtLoad]);
+  }, [draftKeyAtLoad]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autosave drafts to the local database (debounced).
   useEffect(() => {
@@ -156,12 +261,42 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && draftState === 'error' && currentLocation.pathname !== nextLocation.pathname);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const setField = (k: string, v: unknown) => setForm((f) => ({ ...f, fields: { ...f.fields, [k]: v } as NoteFields }));
+  const setValue = (fieldId: string, v: string) =>
+    setForm((f) => ({ ...f, fields: { ...f.fields, values: { ...(f.fields as TemplateFields).values, [fieldId]: v } } as NoteFields }));
+
+  /** Switching type on a new note keeps what can be kept (the extras, and basic text → cloze text). */
+  const switchKind = (kind: NoteKind) => {
+    setForm((f) => {
+      const next = emptyForm(kind, f.sectionId, kind === 'template' ? (pickable[0]?.id ?? null) : null);
+      const extras = { explanation: f.fields.explanation, hint: f.fields.hint, source: f.fields.source };
+      let fields = { ...next.fields, ...extras } as NoteFields;
+      if (kind === 'cloze' && f.kind === 'basic') fields = { ...(fields as ClozeFields), text: (f.fields as BasicFields).front };
+      if (kind === 'basic' && f.kind === 'cloze') fields = { ...(fields as BasicFields), front: (f.fields as ClozeFields).text };
+      return { ...next, fields, tags: f.tags, bookmarked: f.bookmarked };
+    });
+    setErrors({});
+    setPreviewIndex(0);
+  };
+
+  // Live preview of every card the note will make.
+  const preview = useMemo((): { cards: RenderedCard[]; problem: string | null } => {
+    try {
+      return { cards: renderNote(form.kind, form.fields, form.options, template), problem: null };
+    } catch (e) {
+      return { cards: [], problem: (e as Error).message };
+    }
+  }, [form.kind, form.fields, form.options, template]);
+  const shown = preview.cards[Math.min(previewIndex, Math.max(0, preview.cards.length - 1))];
 
   const validate = () => {
     const e: typeof errors = {};
     if (!form.sectionId) e.section = 'Choose a section for this card.';
-    if (!form.front.trim()) e.front = 'The front (question) is required. An image on its own is fine.';
-    if (!form.back.trim()) e.back = 'The back (answer) is required.';
+    if (form.kind === 'template' && !template) e.fields = 'Choose a template.';
+    else {
+      const problems = noteProblems(form.kind, form.fields, template);
+      if (problems.length) e.fields = problems[0];
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -172,35 +307,45 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
     try {
       const pendingTags = tagPending.current.split(',').map((t) => t.trim()).filter(Boolean);
       const tags = [...form.tags, ...pendingTags.filter((t) => !form.tags.some((x) => x.toLowerCase() === t.toLowerCase()))];
-      const body = { ...form, tags, source: form.source.trim() };
-      let saved: Card;
+      const fields = { ...form.fields, source: form.fields.source.trim() };
+      let result: NoteSaveResult;
       if (isNew) {
-        saved = await api.post<Card>('/api/cards', body);
+        result = await api.post<NoteSaveResult>('/api/notes', { sectionId: form.sectionId, kind: form.kind, templateId: form.templateId, fields, options: form.options, tags, bookmarked: form.bookmarked });
       } else {
-        saved = await api.patch<Card>(`/api/cards/${card!.id}`, { ...body, revision: overwrite ? undefined : revision });
+        const bookmarkChanged = form.bookmarked !== baseline.current.bookmarked;
+        result = await api.patch<NoteSaveResult>(`/api/notes/${note!.id}`, {
+          fields,
+          options: form.options,
+          tags,
+          sectionId: form.sectionId,
+          ...(bookmarkChanged ? { bookmarked: form.bookmarked } : {}),
+          revision: overwrite ? undefined : revision,
+        });
       }
       justSaved.current = true;
       pendingDraft.current = null;
       for (const k of new Set([draftKey, liveKey])) if (k) await api.del(`/api/drafts/${k}`).catch(() => undefined);
       invalidateContent();
-      queryClient.setQueryData(['card', saved.id], (old: { card: Card; breadcrumbs: Crumb[] } | undefined) => (old ? { ...old, card: saved } : old));
-      toast.success(isNew ? 'Card created' : 'Card saved');
+      if (card) queryClient.removeQueries({ queryKey: ['card', card.id] });
+      toast.success(syncMessage(result.sync, isNew));
       if (andNext) {
-        const next: Form = { ...EMPTY, sectionId: form.sectionId, tags: form.tags, source: form.source };
+        const next: Form = { ...emptyForm(form.kind, form.sectionId, form.templateId), options: form.options, tags: form.tags };
+        next.fields = { ...next.fields, source: form.fields.source } as NoteFields;
         baseline.current = next;
         setForm(next);
         setRestored(null);
         setStaleDraft(false);
         setDraftState('idle');
+        setPreviewIndex(0);
         justSaved.current = false;
-        requestAnimationFrame(() => frontRef.current?.focus());
+        requestAnimationFrame(() => firstRef.current?.focus());
       } else {
         baseline.current = form;
-        navigate(`/sections/${saved.sectionId}`);
+        navigate(`/sections/${result.note.sectionId}`);
       }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'revision_conflict') {
-        setConflict((e.details as { current?: Card })?.current ?? null);
+        setConflict((e.details as { current?: Note })?.current ?? null);
       } else {
         setErrors({ general: errorMessage(e) });
       }
@@ -212,7 +357,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   const discardDraft = async () => {
     pendingDraft.current = null;
     if (draftKey) await api.del(`/api/drafts/${draftKey}`).catch(() => undefined);
-    if (card) setRevision(card.revision);
+    if (note) setRevision(note.revision);
     setStaleDraft(false);
     setForm(baseline.current);
     setRestored(null);
@@ -241,15 +386,23 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
   const today = dash.data?.today ?? '';
   const mod = useMemo(() => (navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'), []);
   const onError = (m: string) => toast.error(m);
+  const KindIcon = KIND_ICON[form.kind];
+  const liveCards = note?.cards.filter((c) => !c.retired) ?? [];
+  const title = isNew ? `New ${form.kind === 'template' && template ? template.name : NOTE_KIND_LABEL[form.kind].toLowerCase()} note` : 'Edit card';
 
   return (
     <>
       <PageHeader
         docTitle={isNew ? 'New card' : 'Edit card'}
         crumbs={<Breadcrumbs crumbs={breadcrumbList} current={isNew ? 'New card' : 'Edit card'} />}
-        title={isNew ? 'Create card' : 'Edit card'}
+        title={isNew ? 'Create card' : title}
         subtitle={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {!isNew && (
+              <Badge icon={<KindIcon className="size-3" aria-hidden />}>
+                {form.kind === 'template' && template ? template.name : NOTE_KIND_LABEL[form.kind]}
+              </Badge>
+            )}
             {sectionTitle ? (
               <span>
                 in <strong className="font-medium text-text-2">{sectionTitle}</strong>
@@ -262,7 +415,8 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
           </span>
         }
         actions={
-          card && (
+          card &&
+          note && (
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge card={card} today={today} />
               <Button
@@ -271,10 +425,10 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
                 icon={<Copy className="size-4" />}
                 onClick={async () => {
                   try {
-                    const c = await api.post<Card>(`/api/cards/${card.id}/duplicate`);
+                    const r = await api.post<NoteSaveResult>(`/api/notes/${note.id}/duplicate`);
                     invalidateContent();
                     toast.success('Duplicated');
-                    navigate(`/cards/${c.id}/edit`);
+                    navigate(`/cards/${r.primaryCardId}/edit`);
                   } catch (e) {
                     toast.error(errorMessage(e));
                   }
@@ -297,10 +451,16 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
                   }
                 }}
               >
-                {card.suspendedAt ? 'Unsuspend' : 'Suspend'}
+                {card.suspendedAt ? 'Unsuspend' : liveCards.length > 1 ? 'Suspend this card' : 'Suspend'}
               </Button>
-              <Button size="sm" variant="ghost" className="text-danger" icon={<Trash2 className="size-4" />} onClick={() => h.remove('card', card.id, card.front.slice(0, 80) || 'Card', () => navigate(`/sections/${card.sectionId}`))}>
-                Delete
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-danger"
+                icon={<Trash2 className="size-4" />}
+                onClick={() => h.remove('card', card.id, mdPreview(noteTitle(note.kind, note.fields, template), 80) || 'Card', () => navigate(`/sections/${card.sectionId}`))}
+              >
+                {liveCards.length > 1 ? 'Delete note' : 'Delete'}
               </Button>
             </div>
           )
@@ -325,7 +485,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
       )}
       {card?.schedule && (
         <p className="mb-5 text-sm text-muted">
-          Next review {formatDate(card.schedule.dueDate)} · interval {plural(card.schedule.intervalDays, 'day')} · {plural(card.schedule.reviewCount, 'scheduled review')} · {plural(card.schedule.lapseCount, 'lapse')}. Editing the text keeps this history.
+          {card.variantLabel ? `${card.variantLabel}: next` : 'Next'} review {formatDate(card.schedule.dueDate)} · interval {plural(card.schedule.intervalDays, 'day')} · {plural(card.schedule.reviewCount, 'scheduled review')} · {plural(card.schedule.lapseCount, 'lapse')}. Editing the text keeps this history.
         </p>
       )}
 
@@ -338,25 +498,128 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
         noValidate
       >
         <div className="flex min-w-0 flex-col gap-5">
+          {isNew && (
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-text-2">Card type</legend>
+              <Segmented
+                ariaLabel="Card type"
+                value={form.kind}
+                onChange={switchKind}
+                options={NOTE_KINDS.map((k) => {
+                  const Icon = KIND_ICON[k];
+                  return { value: k, label: NOTE_KIND_LABEL[k], icon: <Icon className="size-4" aria-hidden /> };
+                })}
+              />
+              <p className="mt-1.5 text-[13px] text-muted">{KIND_HELP[form.kind]}</p>
+            </fieldset>
+          )}
+          {form.kind === 'template' && isNew && (
+            <Field label="Template" htmlFor="card-template" hint={<Link to="/templates" className="text-primary-text hover:underline">Manage templates</Link>}>
+              {pickable.length ? (
+                <Select id="card-template" value={form.templateId ?? ''} onChange={(e) => setForm((f) => ({ ...f, templateId: e.target.value, fields: emptyFields('template') }))}>
+                  {pickable.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <p className="text-sm text-muted">
+                  No templates yet. <Link to="/templates/new" className="font-medium text-primary-text hover:underline">Create a template</Link> with your own fields and card layouts.
+                </p>
+              )}
+            </Field>
+          )}
+
           <Field label="Section" htmlFor="card-section" error={errors.section}>
             <SectionPicker id="card-section" value={form.sectionId} onChange={(v) => set('sectionId', v)} />
           </Field>
-          <div>
-            <MarkdownEditor ref={frontRef} id="card-front" label="Front — question" value={form.front} onChange={(v) => set('front', v)} placeholder="e.g. Explain non-maximum suppression." minRows={4} invalid={!!errors.front} describedBy={errors.front ? 'front-err' : undefined} onError={onError} />
-            {errors.front && (
-              <p id="front-err" className="mt-1.5 text-sm text-danger" role="alert">
-                {errors.front}
+
+          {form.kind === 'basic' && (
+            <>
+              <MarkdownEditor ref={firstRef} id="card-front" label="Front — question" value={(form.fields as BasicFields).front} onChange={(v) => setField('front', v)} placeholder="e.g. Explain non-maximum suppression." minRows={4} onError={onError} />
+              <MarkdownEditor id="card-back" label="Back — answer" value={(form.fields as BasicFields).back} onChange={(v) => setField('back', v)} placeholder="The answer. Use $$ … $$ for display equations and ``` for code." minRows={6} onError={onError} />
+              <Switch
+                checked={!!form.options.reverse}
+                onChange={(v) => set('options', { ...form.options, reverse: v })}
+                label="Also create a reverse card"
+                description="Asks back → front as a separate card with its own schedule. Turning it off later keeps that card’s history."
+              />
+            </>
+          )}
+
+          {form.kind === 'cloze' && (
+            <div className="flex flex-col gap-1.5">
+              <MarkdownEditor
+                ref={firstRef}
+                cloze
+                id="card-cloze"
+                label="Text with gaps"
+                value={(form.fields as ClozeFields).text}
+                onChange={(v) => setField('text', v)}
+                placeholder="The {{c1::mitochondrion}} is the {{c2::powerhouse::a metaphor}} of the cell."
+                minRows={5}
+                onError={onError}
+              />
+              <p className="text-[13px] text-muted">
+                Select words and press <Kbd>{mod}</Kbd>
+                <Kbd>⇧</Kbd>
+                <Kbd>C</Kbd> (or the [..] button) to make a gap. Each number is one card; reuse a number with <Kbd>{mod}</Kbd>
+                <Kbd>⌥</Kbd>
+                <Kbd>⇧</Kbd>
+                <Kbd>C</Kbd> to hide several parts together. Add a hint like {'{{c1::answer::hint}}'}. Gaps work inside <code>$math$</code> too.
               </p>
-            )}
-          </div>
-          <div>
-            <MarkdownEditor id="card-back" label="Back — answer" value={form.back} onChange={(v) => set('back', v)} placeholder="The answer. Use $$ … $$ for display equations and ``` for code." minRows={6} invalid={!!errors.back} describedBy={errors.back ? 'back-err' : undefined} onError={onError} />
-            {errors.back && (
-              <p id="back-err" className="mt-1.5 text-sm text-danger" role="alert">
-                {errors.back}
-              </p>
-            )}
-          </div>
+            </div>
+          )}
+
+          {form.kind === 'occlusion' && (
+            <>
+              <OcclusionEditor
+                image={(form.fields as OcclusionFields).image}
+                masks={(form.fields as OcclusionFields).masks}
+                onImage={(url) => setField('image', url)}
+                onMasks={(masks) => setField('masks', masks)}
+                onError={onError}
+              />
+              <Field label="While answering" htmlFor="occl-mode">
+                <Segmented
+                  ariaLabel="Which boxes to show while answering"
+                  value={form.options.occlusionMode ?? 'hide-all'}
+                  onChange={(v) => set('options', { ...form.options, occlusionMode: v })}
+                  options={[
+                    { value: 'hide-all', label: 'Hide all boxes, ask one' },
+                    { value: 'hide-one', label: 'Hide only the asked box' },
+                  ]}
+                />
+              </Field>
+              <MarkdownEditor id="card-occl-header" label="Question or context (optional)" value={(form.fields as OcclusionFields).header} onChange={(v) => setField('header', v)} placeholder="e.g. Name the labelled bones." minRows={2} onError={onError} />
+            </>
+          )}
+
+          {form.kind === 'template' && template && (
+            <>
+              {template.fields
+                .filter((f) => !f.removed)
+                .map((f, i) => (
+                  <MarkdownEditor
+                    key={f.id}
+                    ref={i === 0 ? firstRef : undefined}
+                    id={`card-field-${f.id}`}
+                    label={f.name}
+                    value={(form.fields as TemplateFields).values[f.id] ?? ''}
+                    onChange={(v) => setValue(f.id, v)}
+                    minRows={3}
+                    onError={onError}
+                  />
+                ))}
+            </>
+          )}
+
+          {errors.fields && (
+            <p className="-mt-2 text-sm text-danger" role="alert">
+              {errors.fields}
+            </p>
+          )}
 
           <Panel as="div" className="shadow-none">
             <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left" aria-expanded={detailsOpen} aria-controls="card-details" onClick={() => setDetailsOpen(!detailsOpen)}>
@@ -368,63 +631,133 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
             </button>
             {detailsOpen && (
               <div id="card-details" className="flex flex-col gap-4 border-t border-border px-4 py-4">
-                <MarkdownEditor id="card-explanation" label="Explanation (shown after the answer)" value={form.explanation} onChange={(v) => set('explanation', v)} minRows={3} onError={onError} />
+                <MarkdownEditor id="card-explanation" label="Explanation (shown after the answer)" value={form.fields.explanation} onChange={(v) => setField('explanation', v)} minRows={3} onError={onError} />
                 <Field label="Hint" optional htmlFor="card-hint" hint="Hidden until you ask for it while studying.">
-                  <Input id="card-hint" value={form.hint} onChange={(e) => set('hint', e.target.value)} maxLength={10000} />
+                  <Input id="card-hint" value={form.fields.hint} onChange={(e) => setField('hint', e.target.value)} maxLength={10000} />
                 </Field>
-                <Field label="Tags" optional htmlFor="card-tags">
+                <Field label="Tags" optional htmlFor="card-tags" hint={preview.cards.length > 1 ? 'Tags apply to every card of this note.' : undefined}>
                   <TagInput id="card-tags" value={form.tags} onChange={(t) => set('tags', t)} pendingRef={tagPending} />
                 </Field>
                 <Field label="Source" optional htmlFor="card-source" hint="Free text, e.g. “Lecture 3, slide 24”.">
-                  <Input id="card-source" value={form.source} onChange={(e) => set('source', e.target.value)} maxLength={500} />
+                  <Input id="card-source" value={form.fields.source} onChange={(e) => setField('source', e.target.value)} maxLength={500} />
                 </Field>
-                <Checkbox checked={form.bookmarked} onChange={(e) => set('bookmarked', e.target.checked)} label={<span className="inline-flex items-center gap-1.5"><Bookmark className="size-4" aria-hidden /> Bookmark this card</span>} />
+                <Checkbox
+                  checked={form.bookmarked}
+                  onChange={(e) => set('bookmarked', e.target.checked)}
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <Bookmark className="size-4" aria-hidden /> {preview.cards.length > 1 ? 'Bookmark all cards of this note' : 'Bookmark this card'}
+                    </span>
+                  }
+                />
               </div>
             )}
           </Panel>
 
           <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:bottom-3 sm:mx-0 sm:rounded-xl sm:border sm:bg-surface sm:px-3 sm:shadow-pop sm:before:absolute sm:before:inset-x-[-2px] sm:before:bottom-full sm:before:h-4 sm:before:bg-bg sm:before:content-[''] sm:after:absolute sm:after:inset-x-[-2px] sm:after:top-full sm:after:h-3.5 sm:after:bg-bg sm:after:content-['']">
             <Button type="submit" variant="primary" loading={saving} icon={<Save className="size-4" />}>
-              {isNew ? 'Save card' : 'Save changes'}
+              {isNew ? (preview.cards.length > 1 ? `Save ${preview.cards.length} cards` : 'Save card') : 'Save changes'}
             </Button>
             {isNew && (
               <Button onClick={() => save(true)} disabled={saving}>
                 Save & add next
               </Button>
             )}
-            <Button variant="ghost" onClick={() => navigate(form.sectionId ? `/sections/${form.sectionId}` : -1 as never)}>
+            <Button variant="ghost" onClick={() => navigate(form.sectionId ? `/sections/${form.sectionId}` : (-1 as never))}>
               {dirty ? 'Close (draft kept)' : 'Cancel'}
             </Button>
             <span className="ml-auto hidden items-center gap-1 text-xs text-muted md:flex">
               <Kbd>{mod}</Kbd>
-              <Kbd>Enter</Kbd> save{isNew && <> · <Kbd>{mod}</Kbd><Kbd>Shift</Kbd><Kbd>Enter</Kbd> save & next</>}
+              <Kbd>Enter</Kbd> save
+              {isNew && (
+                <>
+                  {' '}
+                  · <Kbd>{mod}</Kbd>
+                  <Kbd>Shift</Kbd>
+                  <Kbd>Enter</Kbd> save & next
+                </>
+              )}
             </span>
           </div>
         </div>
 
         <div className="min-w-0">
           <div className="sticky top-4 flex flex-col gap-4">
-            <p className="text-sm font-medium text-text-2">Preview — as it appears when studying</p>
-            <Panel className="p-6">
-              <p className="mb-3 text-[13px] font-medium text-muted">Question</p>
-              {form.front.trim() ? <Markdown className="text-[17px]">{form.front}</Markdown> : <p className="text-muted">The question appears here.</p>}
-              {form.hint.trim() && (
-                <p className="mt-4 inline-flex items-center gap-1.5 text-sm text-muted">
-                  <Lightbulb className="size-4" aria-hidden /> Hint available
-                </p>
-              )}
-            </Panel>
-            <Panel className="p-6">
-              <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
-              {form.back.trim() ? <Markdown className="text-[17px]">{form.back}</Markdown> : <p className="text-muted">The answer appears here.</p>}
-              {form.explanation.trim() && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <p className="mb-2 text-[13px] font-medium text-muted">Explanation</p>
-                  <Markdown className="text-[15px] text-text-2">{form.explanation}</Markdown>
-                </div>
-              )}
-              {form.source.trim() && <p className="mt-4 text-sm text-muted">Source: {form.source}</p>}
-            </Panel>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-text-2">
+                Preview — as it appears when studying
+                {preview.cards.length > 1 && <span className="font-normal text-muted"> · this note makes {preview.cards.length} cards</span>}
+              </p>
+            </div>
+            {preview.cards.length > 1 && (
+              <div className="flex flex-wrap gap-1" role="tablist" aria-label="Cards made by this note">
+                {preview.cards.map((c, i) => (
+                  <button
+                    key={c.variant}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === previewIndex}
+                    onClick={() => setPreviewIndex(i)}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors',
+                      i === previewIndex ? 'bg-primary-soft text-primary-text' : 'text-muted hover:bg-surface-2 hover:text-text',
+                    )}
+                  >
+                    {c.label || `Card ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!shown ? (
+              <Panel className="p-6">
+                <p className="text-muted">{preview.problem ?? 'The card appears here.'}</p>
+              </Panel>
+            ) : (
+              <>
+                <Panel className="p-6">
+                  <p className="mb-3 text-[13px] font-medium text-muted">Question</p>
+                  <CardFace render={shown.render} front={shown.front} back={shown.back} side="front" className="text-[17px]" />
+                  {form.fields.hint.trim() && (
+                    <p className="mt-4 inline-flex items-center gap-1.5 text-sm text-muted">
+                      <Lightbulb className="size-4" aria-hidden /> Hint available
+                    </p>
+                  )}
+                </Panel>
+                <Panel className="p-6">
+                  <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
+                  <CardFace render={shown.render} front={shown.front} back={shown.back} side="back" className="text-[17px]" />
+                  {form.fields.explanation.trim() && (
+                    <div className="mt-5 border-t border-border pt-4">
+                      <p className="mb-2 text-[13px] font-medium text-muted">Explanation</p>
+                      <Markdown className="text-[15px] text-text-2">{form.fields.explanation}</Markdown>
+                    </div>
+                  )}
+                  {form.fields.source.trim() && <p className="mt-4 text-sm text-muted">Source: {form.fields.source}</p>}
+                </Panel>
+              </>
+            )}
+            {note && note.cards.length > 1 && (
+              <Panel className="p-4">
+                <p className="mb-2 text-sm font-medium text-text-2">Cards of this note</p>
+                <ul className="flex flex-col gap-1 text-sm">
+                  {note.cards.map((c) => (
+                    <li key={c.id} className={cn('flex flex-wrap items-center gap-x-2', c.retired && 'text-muted')}>
+                      {c.id === card?.id ? <strong className="font-medium">{c.label || 'Card'}</strong> : <Link to={`/cards/${c.id}/edit`} className="hover:underline">{c.label || 'Card'}</Link>}
+                      <span className="text-muted">
+                        ·{' '}
+                        {c.retired
+                          ? 'removed from the note — history kept, comes back if you add it again'
+                          : c.suspended
+                            ? 'suspended'
+                            : c.dueDate
+                              ? `due ${relativeDay(c.dueDate, today)}`
+                              : 'new'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
           </div>
         </div>
       </form>
@@ -439,7 +772,7 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
             <>
               <Button
                 onClick={() => {
-                  const f = fromCard(conflict);
+                  const f = fromNote(conflict);
                   baseline.current = f;
                   setForm(f);
                   setRevision(conflict.revision);
@@ -466,9 +799,9 @@ function EditorInner({ card, crumbs, initialSection, first }: { card: Card | nul
           }
         >
           <div className="grid gap-3 text-sm">
-            <p className="font-medium">Current saved front:</p>
+            <p className="font-medium">Currently saved:</p>
             <div className="max-h-48 overflow-auto rounded-xl bg-surface-2 p-3">
-              <Markdown>{conflict.front}</Markdown>
+              <Markdown>{noteTitle(conflict.kind, conflict.fields, template)}</Markdown>
             </div>
           </div>
         </Modal>

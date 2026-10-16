@@ -64,6 +64,7 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
     bookmarkedOnly: false,
     status: 'any',
     weakBasis: 'all',
+    oneCardPerNote: true,
   });
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,6 +307,14 @@ function Builder({ tree, defaults }: { tree: TreeProgram[]; defaults: NonNullabl
                 </Field>
               )}
               <Checkbox checked={filters.bookmarkedOnly} onChange={(e) => setFilters({ ...filters, bookmarkedOnly: e.target.checked })} label="Only bookmarked cards" />
+              {!cardIds.length && (
+                <Checkbox
+                  checked={filters.oneCardPerNote !== false}
+                  onChange={(e) => setFilters({ ...filters, oneCardPerNote: e.target.checked })}
+                  label="One card per note"
+                  description="A reverse card or another gap of the same cloze waits for a later session, so it can’t give the answer away."
+                />
+              )}
               {(tags.data?.length ?? 0) > 0 && (
                 <fieldset>
                   <legend className="mb-1.5 text-sm font-medium text-text-2">Only cards with any of these tags</legend>

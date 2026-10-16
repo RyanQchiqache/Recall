@@ -19,6 +19,7 @@ const FIELDS = [
   { key: 'source', label: 'Source' },
   { key: 'explanation', label: 'Explanation' },
   { key: 'hint', label: 'Hint' },
+  { key: 'type', label: 'Card type (basic, reverse or cloze)' },
 ] as const;
 
 interface Inspect {
@@ -213,6 +214,7 @@ export function CsvImportDialog({ courseId, courseTitle, sections, onClose }: { 
                     <th className="px-3 py-2 font-medium">Front</th>
                     <th className="px-3 py-2 font-medium">Back</th>
                     <th className="px-3 py-2 font-medium">Section</th>
+                    <th className="px-3 py-2 font-medium">Type</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -227,6 +229,7 @@ export function CsvImportDialog({ courseId, courseTitle, sections, onClose }: { 
                         <span className="line-clamp-3 whitespace-pre-wrap">{r.back || <em className="text-muted">empty</em>}</span>
                       </td>
                       <td className="px-3 py-2">{r.section}</td>
+                      <td className="px-3 py-2 capitalize">{r.type}</td>
                       <td className="px-3 py-2">
                         {r.status === 'ok' ? <Badge tone="success">OK</Badge> : r.status === 'duplicate' ? <Badge tone="warning">Duplicate</Badge> : <span className="text-danger">{r.errors.join('; ')}</span>}
                       </td>

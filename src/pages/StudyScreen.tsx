@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { MODE_LABEL, RATING_INFO, RATINGS, type Rating } from '../../shared/ratings.ts';
 import type { SessionState } from '../../shared/types.ts';
+import { CardFace, revealsInPlace } from '../components/CardFace.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { RATING_COLOR, RATING_ICON } from '../components/ratingUi.tsx';
 import { Button, IconButton, LinkButton } from '../components/ui/Button.tsx';
@@ -303,6 +304,7 @@ export function StudyScreen() {
                       {snap.courseTitle} › {snap.sectionTitle}
                     </span>
                   </span>
+                  {snap.variantLabel && <Badge>{snap.variantLabel}</Badge>}
                   {s.current.isRepeat && (
                     <Badge tone="warning" icon={<Repeat2 className="size-3" aria-hidden />}>
                       Repeat · attempt {s.current.attempt} of {s.maxAttempts}
@@ -320,7 +322,14 @@ export function StudyScreen() {
                   </p>
                 )}
                 <h1 className="sr-only">Question</h1>
-                <Markdown className="text-[19px] leading-relaxed sm:text-xl">{snap.front}</Markdown>
+                {/* Cloze and image-occlusion cards reveal the answer inside the question itself. */}
+                <CardFace
+                  render={snap.render}
+                  front={snap.front}
+                  back={snap.back}
+                  side={s.revealed && revealsInPlace(snap.render) ? 'back' : 'front'}
+                  className="text-[19px] leading-relaxed sm:text-xl"
+                />
 
                 {snap.hint && !s.revealed && (
                   <div className="mt-6">
@@ -355,8 +364,15 @@ export function StudyScreen() {
                         <p className="text-[15px] whitespace-pre-wrap">{s.typedAnswer}</p>
                       </div>
                     )}
-                    <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
-                    <Markdown className="text-[17px] leading-relaxed">{snap.back}</Markdown>
+                    {!revealsInPlace(snap.render) && (
+                      <>
+                        <p className="mb-3 text-[13px] font-medium text-muted">Answer</p>
+                        <Markdown className="text-[17px] leading-relaxed">{snap.back}</Markdown>
+                      </>
+                    )}
+                    {revealsInPlace(snap.render) && !snap.explanation && !snap.source && !(s.mode === 'test' && s.typedAnswer) && (
+                      <p className="text-sm text-muted">The answer is shown above.</p>
+                    )}
                     {snap.explanation && (
                       <div className="mt-6 rounded-xl bg-surface-2 px-5 py-4">
                         <p className="mb-2 text-[13px] font-medium text-muted">Explanation</p>

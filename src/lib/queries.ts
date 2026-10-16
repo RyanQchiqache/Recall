@@ -1,6 +1,8 @@
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import type { AppSettings } from '../../shared/settings.ts';
 import type {
+  Note,
+  NoteTemplate,
   Card,
   CardListResponse,
   Course,
@@ -29,7 +31,7 @@ export const queryClient = new QueryClient({
 
 /** Refresh everything that depends on cards / hierarchy. */
 export function invalidateContent() {
-  for (const key of ['tree', 'dashboard', 'course', 'section', 'cards', 'card', 'stats', 'trash', 'tags', 'preview', 'openSession', 'session', 'results']) {
+  for (const key of ['tree', 'dashboard', 'course', 'section', 'cards', 'card', 'stats', 'trash', 'tags', 'preview', 'openSession', 'session', 'results', 'templates', 'template']) {
     queryClient.invalidateQueries({ queryKey: [key] });
   }
 }
@@ -81,7 +83,7 @@ export const useCards = (params: CardQuery, enabled = true) =>
 export const useCard = (id?: string) =>
   useQuery({
     queryKey: ['card', id],
-    queryFn: () => api.get<{ card: Card; breadcrumbs: Crumb[] }>(`/api/cards/${id}`),
+    queryFn: () => api.get<{ card: Card; note: Note; breadcrumbs: Crumb[] }>(`/api/cards/${id}`),
     enabled: !!id,
     staleTime: 0,
   });
@@ -109,3 +111,9 @@ export const useStats = (params: Record<string, string | undefined>) =>
 export const useTrash = () => useQuery({ queryKey: ['trash'], queryFn: () => api.get<TrashItem[]>('/api/trash') });
 
 export const useSnapshots = () => useQuery({ queryKey: ['snapshots'], queryFn: () => api.get<SnapshotInfo[]>('/api/snapshots') });
+
+export const useTemplates = (includeArchived = false) =>
+  useQuery({ queryKey: ['templates', includeArchived], queryFn: () => api.get<NoteTemplate[]>(`/api/templates${qs({ includeArchived })}`) });
+
+export const useTemplate = (id?: string) =>
+  useQuery({ queryKey: ['template', id], queryFn: () => api.get<NoteTemplate>(`/api/templates/${id}`), enabled: !!id, staleTime: 0 });
