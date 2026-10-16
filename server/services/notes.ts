@@ -515,11 +515,11 @@ export function reorderNotes(ctx: Ctx, sectionId: string, orderedNoteIds: string
   const listed = new Set(orderedNoteIds);
   const finalOrder = [...orderedNoteIds, ...siblings.map((n) => n.id).filter((nid) => !listed.has(nid))];
   const ts = nowIso(ctx);
-  const n = ctx.db.prepare('UPDATE notes SET position = ?, updated_at = ? WHERE id = ?');
-  const c = ctx.db.prepare('UPDATE cards SET position = ?, updated_at = ? WHERE note_id = ?');
+  const n = ctx.db.prepare('UPDATE notes SET position = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND position <> ?');
+  const c = ctx.db.prepare('UPDATE cards SET position = ?, revision = revision + 1, updated_at = ? WHERE note_id = ? AND position <> ?');
   finalOrder.forEach((nid, position) => {
-    n.run(position, ts, nid);
-    c.run(position, ts, nid);
+    n.run(position, ts, nid, position);
+    c.run(position, ts, nid, position);
   });
 }
 

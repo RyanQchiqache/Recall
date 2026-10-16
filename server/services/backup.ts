@@ -37,6 +37,7 @@ export const FULL_TABLES = [
   'study_sessions',
   'session_cards',
   'review_events',
+  'card_action_undos',
   'settings',
   'drafts',
 ] as const;

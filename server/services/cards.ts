@@ -5,6 +5,7 @@ import { badRequest, conflict, notFound, placeholders } from '../lib/util.ts';
 import { parse, zId } from '../lib/validate.ts';
 import { getRow, impactOf, itemState, moveToTrash, removeOrphanTags } from './hierarchy.ts';
 import { CARD_SELECT, toCard, type CardListRow, type CardRow } from './mappers.ts';
+import { captureCardAction, recordCardAction, undoCardAction } from './card-actions.ts';
 import {
   createNote,
   duplicateNote,
@@ -22,6 +23,8 @@ import {
   updateNote,
 } from './notes.ts';
 import { today } from './time.ts';
+
+export { undoCardAction };
 
 const MAX_SIDE = 200_000;
 
@@ -156,8 +159,23 @@ export function reorderCards(ctx: Ctx, input: unknown) {
     const r = inSection.get(id) as { section_id: string } | undefined;
     if (!r || r.section_id !== data.sectionId) throw badRequest('All reordered cards must belong to the same section');
   }
-  ctx.db.transaction(() => reorderNotes(ctx, data.sectionId, notesOfCards(ctx, data.ids)))();
-  return { ok: true };
+  const orderedNoteIds = notesOfCards(ctx, data.ids);
+  const allNoteIds = (
+    ctx.db
+      .prepare('SELECT id FROM notes WHERE section_id = ? AND deleted_at IS NULL ORDER BY position, created_at, id')
+      .all(data.sectionId) as { id: string }[]
+  ).map((note) => note.id);
+  let undoId = '';
+  ctx.db.transaction(() => {
+    const pending = captureCardAction(ctx, 'reorder', {
+      noteIds: allNoteIds,
+      sectionIds: [data.sectionId],
+      affected: orderedNoteIds.length,
+    });
+    reorderNotes(ctx, data.sectionId, orderedNoteIds);
+    undoId = recordCardAction(ctx, pending);
+  })();
+  return { ok: true, undoId };
 }
 
 export interface ListQuery {
@@ -287,7 +305,7 @@ const bulkSchema = z.object({
   tags: z.array(zTag).max(50).optional(),
 });
 
-export function bulkCards(ctx: Ctx, input: unknown): { affected: number } {
+export function bulkCards(ctx: Ctx, input: unknown): { affected: number; undoId?: string } {
   const data = parse(bulkSchema, input);
   const ids = [...new Set(data.ids)];
   const existing = ctx.db
@@ -296,12 +314,29 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number } {
   if (existing.length !== ids.length) throw badRequest('Some selected cards no longer exist');
   const ts = nowIso(ctx);
   const db = ctx.db;
+  let undoId: string | undefined;
   const run = db.transaction(() => {
+    const noteIds = notesOfCards(ctx, ids);
+    let pending: ReturnType<typeof captureCardAction> | undefined;
+    if (data.action === 'move') {
+      if (!data.sectionId) throw badRequest('Choose a destination section');
+      const sourceSections = (
+        db.prepare(`SELECT DISTINCT section_id FROM notes WHERE id IN (${placeholders(noteIds.length)})`).all(...noteIds) as { section_id: string }[]
+      ).map((row) => row.section_id);
+      pending = captureCardAction(ctx, 'move', {
+        noteIds,
+        sectionIds: [...sourceSections, data.sectionId],
+        affected: ids.length,
+      });
+    } else if (data.action === 'addTags' || data.action === 'removeTags') {
+      pending = captureCardAction(ctx, data.action, { noteIds, affected: ids.length });
+    } else if (data.action === 'suspend' || data.action === 'unsuspend') {
+      pending = captureCardAction(ctx, data.action, { noteIds, cardIds: ids, affected: ids.length });
+    }
     switch (data.action) {
       case 'move': {
-        if (!data.sectionId) throw badRequest('Choose a destination section');
         // Cards of one note stay together, so moving a card moves its whole note.
-        moveNotes(ctx, notesOfCards(ctx, ids), data.sectionId);
+        moveNotes(ctx, noteIds, data.sectionId!);
         break;
       }
       case 'addTags':
@@ -345,7 +380,8 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number } {
         for (const id of ids) moveToTrash(ctx, 'card', id);
         break;
     }
+    if (pending) undoId = recordCardAction(ctx, pending);
   });
   run();
-  return { affected: ids.length };
+  return { affected: ids.length, ...(undoId ? { undoId } : {}) };
 }

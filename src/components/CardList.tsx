@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { Card } from '../../shared/types.ts';
 import { api, errorMessage } from '../lib/api.ts';
+import { type CardActionResult, useCardActionUndo } from '../lib/cardActionUndo.ts';
 import { formatDate, mdPreview, plural, relativeDay } from '../lib/format.ts';
 import { invalidateContent, useTree } from '../lib/queries.ts';
 import { cn } from '../lib/util.ts';
@@ -178,7 +179,8 @@ export function SectionPicker({ id, value, onChange, exclude }: { id: string; va
 }
 
 export function MoveCardsDialog({ ids, currentSectionId, onClose, onDone }: { ids: string[]; currentSectionId?: string; onClose: () => void; onDone?: () => void }) {
-  const toast = useToast();
+  const offerUndo = useCardActionUndo();
+  const tree = useTree();
   const [target, setTarget] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,9 +199,10 @@ export function MoveCardsDialog({ ids, currentSectionId, onClose, onDone }: { id
             onClick={async () => {
               setBusy(true);
               try {
-                await api.post('/api/cards/bulk', { ids, action: 'move', sectionId: target });
+                const result = await api.post<CardActionResult>('/api/cards/bulk', { ids, action: 'move', sectionId: target });
                 invalidateContent();
-                toast.success(`Moved ${plural(ids.length, 'card')}`);
+                const destination = (tree.data ?? []).flatMap((program) => program.semesters.flatMap((semester) => semester.courses.flatMap((course) => course.sections))).find((section) => section.id === target)?.title;
+                offerUndo(result, `Moved ${plural(ids.length, 'card')} to ${destination ?? 'the selected section'}`, 'Move undone');
                 onDone?.();
                 onClose();
               } catch (e) {
@@ -226,7 +229,7 @@ export function MoveCardsDialog({ ids, currentSectionId, onClose, onDone }: { id
 }
 
 export function TagCardsDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () => void; onDone?: () => void }) {
-  const toast = useToast();
+  const offerUndo = useCardActionUndo();
   const [mode, setMode] = useState<'addTags' | 'removeTags'>('addTags');
   const [tags, setTags] = useState('');
   const [busy, setBusy] = useState(false);
@@ -247,9 +250,9 @@ export function TagCardsDialog({ ids, onClose, onDone }: { ids: string[]; onClos
             onClick={async () => {
               setBusy(true);
               try {
-                await api.post('/api/cards/bulk', { ids, action: mode, tags: list });
+                const result = await api.post<CardActionResult>('/api/cards/bulk', { ids, action: mode, tags: list });
                 invalidateContent();
-                toast.success(mode === 'addTags' ? 'Tags added' : 'Tags removed');
+                offerUndo(result, `${mode === 'addTags' ? 'Added tags to' : 'Removed tags from'} ${plural(ids.length, 'card')}`, 'Tag change undone');
                 onDone?.();
                 onClose();
               } catch (e) {

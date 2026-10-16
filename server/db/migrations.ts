@@ -311,6 +311,20 @@ CREATE INDEX idx_cards_note ON cards(note_id, variant_order);
 CREATE UNIQUE INDEX idx_cards_note_variant ON cards(note_id, variant);
 `,
   },
+  {
+    version: 4,
+    name: 'reversible card actions',
+    sql: `
+CREATE TABLE card_action_undos (
+  id TEXT PRIMARY KEY,
+  action TEXT NOT NULL CHECK (action IN ('move', 'addTags', 'removeTags', 'suspend', 'unsuspend', 'reorder')),
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  undone_at TEXT
+);
+CREATE INDEX idx_card_action_undos_created ON card_action_undos(created_at);
+`,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

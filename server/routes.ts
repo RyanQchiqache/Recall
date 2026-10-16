@@ -147,6 +147,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     return cards.duplicateCard(ctx, req.params.id);
   });
   post('/api/cards/bulk', (req) => cards.bulkCards(ctx, body(req)));
+  post('/api/cards/actions/:id/undo', (req) => cards.undoCardAction(ctx, req.params.id));
   get('/api/tags', () => cards.listTags(ctx));
 
   // ----- Notes (the written content behind one or more cards) -----

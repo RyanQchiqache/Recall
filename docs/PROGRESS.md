@@ -98,9 +98,9 @@ The searchable offline How-to page is complete. The following parts remain:
 
 ### 9. More reversible actions
 
-- [ ] Add transactional Undo for moving, tagging, suspending, unsuspending and reordering cards where safe.
-- [ ] Use the existing toast pattern and state the exact affected count and destination.
-- [ ] Keep permanent-deletion confirmation and edit-conflict protection.
+- [x] Add transactional Undo for moving, tagging, suspending, unsuspending and reordering cards where safe.
+- [x] Use the existing toast pattern and state the exact affected count and destination.
+- [x] Keep permanent-deletion confirmation and edit-conflict protection.
 
 ### 10. Better session completion
 

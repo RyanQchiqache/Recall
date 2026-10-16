@@ -13,6 +13,7 @@ import { Input, Segmented } from '../components/ui/Form.tsx';
 import { Menu } from '../components/ui/Menu.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { api, downloadUrl, errorMessage } from '../lib/api.ts';
+import { type CardActionResult, useCardActionUndo } from '../lib/cardActionUndo.ts';
 import { formatDate, plural } from '../lib/format.ts';
 import { invalidateContent, useCards, useDashboard, useSection } from '../lib/queries.ts';
 import { useDebounced } from '../lib/util.ts';
@@ -33,6 +34,7 @@ export function SectionPage() {
   const dash = useDashboard();
   const h = useHierarchy();
   const toast = useToast();
+  const offerUndo = useCardActionUndo();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<CardFilter>('all');
   const [query, setQuery] = useState('');
@@ -66,10 +68,10 @@ export function SectionPage() {
   };
   const bulk = async (action: string, msg: string) => {
     try {
-      await api.post('/api/cards/bulk', { ids, action });
+      const result = await api.post<CardActionResult>('/api/cards/bulk', { ids, action });
       invalidateContent();
       setSelected(new Set());
-      toast.success(msg);
+      offerUndo(result, msg);
     } catch (e) {
       toast.error(errorMessage(e));
     }
@@ -81,8 +83,9 @@ export function SectionPage() {
     const ordered = all.map((card) => card.id);
     [ordered[index], ordered[index + direction]] = [ordered[index + direction], ordered[index]];
     try {
-      await api.post('/api/cards/reorder', { sectionId: s.id, ids: ordered });
+      const result = await api.post<CardActionResult>('/api/cards/reorder', { sectionId: s.id, ids: ordered });
       invalidateContent();
+      offerUndo(result, direction < 0 ? 'Moved card up' : 'Moved card down', 'Reorder undone');
     } catch (e) {
       toast.error(errorMessage(e));
     }
