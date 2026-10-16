@@ -35,6 +35,25 @@ describe('reversible card actions', () => {
     expect((await a.api('GET', `/api/cards/${ids[1]}`)).body.card.suspendedAt).toBeNull();
   });
 
+  it('reports and restores every sibling card changed through one note', async () => {
+    const a = await app();
+    const hierarchy = await seedHierarchy(a, [0]);
+    const created = await a.api('POST', '/api/notes', {
+      sectionId: hierarchy.sections[0].id,
+      kind: 'basic',
+      fields: { front: 'Question', back: 'Answer' },
+      options: { reverse: true },
+      tags: ['original'],
+    });
+    const ids = created.body.note.cards.map((card: { id: string }) => card.id);
+    expect(ids).toHaveLength(2);
+
+    const tagged = await a.api('POST', '/api/cards/bulk', { ids: [ids[0]], action: 'addTags', tags: ['exam'] });
+    expect(tagged.body.affected).toBe(2);
+    expect((await a.api('POST', `/api/cards/actions/${tagged.body.undoId}/undo`)).body.affected).toBe(2);
+    for (const id of ids) expect((await a.api('GET', `/api/cards/${id}`)).body.card.tags).toEqual(['original']);
+  });
+
   it('restores exact section order after a bulk move and a reorder', async () => {
     const a = await app();
     const hierarchy = await seedHierarchy(a, [3, 2]);

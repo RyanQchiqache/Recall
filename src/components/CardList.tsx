@@ -1,6 +1,7 @@
-import { ArrowDown, ArrowUp, Bookmark, BookmarkMinus, Copy, FolderInput, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bookmark, BookmarkMinus, Copy, FolderInput, Pause, Pencil, Play, Tag, Trash2, FileText, Brackets, ImageIcon, LayoutTemplate } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { NOTE_KIND_LABEL } from '../../shared/notes.ts';
 import type { Card } from '../../shared/types.ts';
 import { api, errorMessage } from '../lib/api.ts';
 import { type CardActionResult, useCardActionUndo } from '../lib/cardActionUndo.ts';
@@ -36,6 +37,22 @@ export function StatusBadge({ card, today }: { card: Card; today: string }) {
   }
 }
 
+const KIND_ICON = { basic: FileText, cloze: Brackets, occlusion: ImageIcon, template: LayoutTemplate } as const;
+
+/** Which card of a note this is ("Reverse", "Cloze 2", "Box: Femur"); nothing for a plain basic card. */
+export function VariantBadge({ card }: { card: Card }) {
+  if (card.kind === 'basic' && !card.variantLabel) return null;
+  const Icon = KIND_ICON[card.kind] ?? FileText;
+  const label = card.variantLabel || NOTE_KIND_LABEL[card.kind];
+  return (
+    <Tip content={card.siblingCount > 1 ? `One of ${card.siblingCount} cards made by the same note` : NOTE_KIND_LABEL[card.kind]}>
+      <span>
+        <Badge icon={<Icon className="size-3" aria-hidden />}>{label}</Badge>
+      </span>
+    </Tip>
+  );
+}
+
 /** Compact search-result style row. */
 export function CardRowCompact({ card, today, showSection }: { card: Card; today: string; showSection?: boolean }) {
   return (
@@ -44,6 +61,7 @@ export function CardRowCompact({ card, today, showSection }: { card: Card; today
         <p className="line-clamp-2 text-[15px]">{mdPreview(card.front, 220) || <em className="text-muted">Image-only question</em>}</p>
         <p className="mt-0.5 line-clamp-1 text-sm text-muted">{mdPreview(card.back, 160)}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <VariantBadge card={card} />
           {showSection && (
             <span className="text-xs text-muted">
               {card.courseTitle} › {card.sectionTitle}
@@ -101,6 +119,7 @@ export function CardRow({
         <p className="mt-0.5 line-clamp-1 text-sm text-muted">{mdPreview(card.back, 180)}</p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <StatusBadge card={card} today={today} />
+          <VariantBadge card={card} />
           {card.lastRating && <RatingBadge rating={card.lastRating} />}
           {card.tags.map((t) => (
             <Badge key={t}>#{t}</Badge>
@@ -202,7 +221,7 @@ export function MoveCardsDialog({ ids, currentSectionId, onClose, onDone }: { id
                 const result = await api.post<CardActionResult>('/api/cards/bulk', { ids, action: 'move', sectionId: target });
                 invalidateContent();
                 const destination = (tree.data ?? []).flatMap((program) => program.semesters.flatMap((semester) => semester.courses.flatMap((course) => course.sections))).find((section) => section.id === target)?.title;
-                offerUndo(result, `Moved ${plural(ids.length, 'card')} to ${destination ?? 'the selected section'}`, 'Move undone');
+                offerUndo(result, `Moved ${plural(result.affected, 'card')} to ${destination ?? 'the selected section'}`, 'Move undone');
                 onDone?.();
                 onClose();
               } catch (e) {
@@ -252,7 +271,7 @@ export function TagCardsDialog({ ids, onClose, onDone }: { ids: string[]; onClos
               try {
                 const result = await api.post<CardActionResult>('/api/cards/bulk', { ids, action: mode, tags: list });
                 invalidateContent();
-                offerUndo(result, `${mode === 'addTags' ? 'Added tags to' : 'Removed tags from'} ${plural(ids.length, 'card')}`, 'Tag change undone');
+                offerUndo(result, `${mode === 'addTags' ? 'Added tags to' : 'Removed tags from'} ${plural(result.affected, 'card')}`, 'Tag change undone');
                 onDone?.();
                 onClose();
               } catch (e) {

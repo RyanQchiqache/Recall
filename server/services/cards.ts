@@ -165,12 +165,20 @@ export function reorderCards(ctx: Ctx, input: unknown) {
       .prepare('SELECT id FROM notes WHERE section_id = ? AND deleted_at IS NULL ORDER BY position, created_at, id')
       .all(data.sectionId) as { id: string }[]
   ).map((note) => note.id);
+  const listed = new Set(orderedNoteIds);
+  const finalOrder = [...orderedNoteIds, ...allNoteIds.filter((noteId) => !listed.has(noteId))];
+  const changedNoteIds = finalOrder.filter((noteId, index) => allNoteIds[index] !== noteId);
+  const affected = changedNoteIds.length
+    ? (ctx.db
+        .prepare(`SELECT COUNT(*) AS n FROM cards WHERE retired_at IS NULL AND deleted_at IS NULL AND note_id IN (${placeholders(changedNoteIds.length)})`)
+        .get(...changedNoteIds) as { n: number }).n
+    : 0;
   let undoId = '';
   ctx.db.transaction(() => {
     const pending = captureCardAction(ctx, 'reorder', {
       noteIds: allNoteIds,
       sectionIds: [data.sectionId],
-      affected: orderedNoteIds.length,
+      affected,
     });
     reorderNotes(ctx, data.sectionId, orderedNoteIds);
     undoId = recordCardAction(ctx, pending);
@@ -314,22 +322,31 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number; undoId?
   if (existing.length !== ids.length) throw badRequest('Some selected cards no longer exist');
   const ts = nowIso(ctx);
   const db = ctx.db;
+  let affected = ids.length;
   let undoId: string | undefined;
   const run = db.transaction(() => {
     const noteIds = notesOfCards(ctx, ids);
+    const affectedNoteCards = () =>
+      noteIds.length
+        ? (db
+            .prepare(`SELECT COUNT(*) AS n FROM cards WHERE retired_at IS NULL AND deleted_at IS NULL AND note_id IN (${placeholders(noteIds.length)})`)
+            .get(...noteIds) as { n: number }).n
+        : 0;
     let pending: ReturnType<typeof captureCardAction> | undefined;
     if (data.action === 'move') {
       if (!data.sectionId) throw badRequest('Choose a destination section');
       const sourceSections = (
         db.prepare(`SELECT DISTINCT section_id FROM notes WHERE id IN (${placeholders(noteIds.length)})`).all(...noteIds) as { section_id: string }[]
       ).map((row) => row.section_id);
+      affected = affectedNoteCards();
       pending = captureCardAction(ctx, 'move', {
         noteIds,
         sectionIds: [...sourceSections, data.sectionId],
-        affected: ids.length,
+        affected,
       });
     } else if (data.action === 'addTags' || data.action === 'removeTags') {
-      pending = captureCardAction(ctx, data.action, { noteIds, affected: ids.length });
+      affected = affectedNoteCards();
+      pending = captureCardAction(ctx, data.action, { noteIds, affected });
     } else if (data.action === 'suspend' || data.action === 'unsuspend') {
       pending = captureCardAction(ctx, data.action, { noteIds, cardIds: ids, affected: ids.length });
     }
@@ -383,5 +400,5 @@ export function bulkCards(ctx: Ctx, input: unknown): { affected: number; undoId?
     if (pending) undoId = recordCardAction(ctx, pending);
   });
   run();
-  return { affected: ids.length, ...(undoId ? { undoId } : {}) };
+  return { affected, ...(undoId ? { undoId } : {}) };
 }
