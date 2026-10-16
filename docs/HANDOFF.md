@@ -4,7 +4,7 @@ Work through the parts in order. Recall is a local, offline, single-user flashca
 
 ## Ground rules
 
-- Other Claude sessions sometimes edit this repo at the same time. Run `ListAgents` before starting, and don't edit files another session is working on.
+- Other coding sessions sometimes edit this repo at the same time. Check for active agents before starting, and don't edit files another session is working on.
 - Use Node 24. If `node -v` is not 24, run `export PATH=/opt/homebrew/opt/node@24/bin:$PATH`.
 - Git has no identity configured. Commit with `git -c user.name=r.qchiqache -c user.email=r.qchiqache@reply.de commit ...`.
 - Make one commit per change, using the existing message style (`fix(scope): ...`, `feat(scope): ...`).
