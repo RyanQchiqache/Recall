@@ -147,6 +147,7 @@ Add or clear an exam date in the course settings. The dashboard then recalculate
 
 - **Learn today** spreads new cards across the available days, normally keeping the final three days before the exam for review only (or fewer when the exam is close).
 - **Revise today** is the number of cards currently due. **Study plan** opens the normal session builder prefilled with exactly the due cards and today’s new-card allowance.
+- **Current seven-day plan** shows those same learn and revise calculations for the coming week, grouped by course. It includes currently scheduled reviews and clearly notes that future ratings can move later dates.
 - **Learned** means a card has been studied at least once. **Answering well** means its latest scheduled-review rating was Very good or Perfect. These are personal confidence signals, not predicted exam scores.
 - **On track / Behind by N cards** compares cards learned so far with the even pace from when the exam date was set. If a day is skipped, tomorrow’s plan automatically spreads what remains over fewer days.
 

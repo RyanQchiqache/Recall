@@ -1,4 +1,5 @@
 import { addDays, dateRange, diffDays, isLocalDate, localDateOf, startOfLocalDay } from '../../shared/dates.ts';
+import { buildExamWorkload } from '../../shared/exam-planner.ts';
 import type { Rating, StudyMode } from '../../shared/ratings.ts';
 import type { DashboardData, ExamPlan, ModeStats, StatsData, StatsQuery, TreeCourse } from '../../shared/types.ts';
 import type { Ctx } from '../context.ts';
@@ -233,11 +234,24 @@ function examPlanFor(ctx: Ctx, course: TreeCourse, day: string, timeZone: string
       learnedPercent: active ? Math.round((learned / active) * 100) : 0,
       solidPercent: active ? Math.round((solid / active) * 100) : 0,
       behindBy: 0,
+      days: [],
     };
   }
 
-  const bufferDays = Math.min(3, Math.max(0, daysToExam - 1));
-  const learningDaysLeft = Math.max(1, daysToExam - bufferDays);
+  const dueDates = ctx.db
+    .prepare(
+      `SELECT cs.due_date
+       FROM card_ctx c JOIN card_schedules cs ON cs.card_id = c.id
+       WHERE c.course_id = ? AND c.in_trash = 0 AND c.in_archive = 0 AND c.suspended_at IS NULL`,
+    )
+    .all(course.id) as { due_date: string }[];
+  const workload = buildExamWorkload({
+    today: day,
+    examDate: course.examDate,
+    newCards: course.counts.new,
+    dueDates: dueDates.map((row) => row.due_date),
+  });
+  const todayPlan = workload.days[0] ?? { learn: 0, revise: 0 };
   const planStart = course.examSetAt ? localDateOf(course.examSetAt, timeZone) : day;
   const totalDays = Math.max(1, diffDays(planStart, course.examDate));
   const totalBuffer = Math.min(3, Math.max(0, totalDays - 1));
@@ -247,12 +261,13 @@ function examPlanFor(ctx: Ctx, course: TreeCourse, day: string, timeZone: string
   return {
     status: 'upcoming',
     daysToExam,
-    bufferDays,
-    learnToday: course.counts.new > 0 ? Math.ceil(course.counts.new / learningDaysLeft) : 0,
-    reviseToday: course.counts.due,
+    bufferDays: workload.bufferDays,
+    learnToday: todayPlan.learn,
+    reviseToday: todayPlan.revise,
     learnedPercent: active ? Math.round((learned / active) * 100) : 0,
     solidPercent: active ? Math.round((solid / active) * 100) : 0,
     behindBy: Math.max(0, expectedLearned - learned),
+    days: workload.days,
   };
 }
 

@@ -318,6 +318,8 @@ export interface ExamPlan {
   learnedPercent: number;
   solidPercent: number;
   behindBy: number;
+  /** The current plan for today and up to six following days. */
+  days: import('./exam-planner.ts').ExamPlanDay[];
 }
 
 export interface StatsQuery {

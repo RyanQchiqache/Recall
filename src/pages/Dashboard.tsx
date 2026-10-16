@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CalendarClock, ChevronDown, Clock3, Flame, FlaskConical, GraduationCap, Inbox, Layers, Play, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarClock, CalendarDays, ChevronDown, Clock3, Flame, FlaskConical, GraduationCap, Inbox, Layers, Play, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { diffDays } from '../../shared/dates.ts';
@@ -6,7 +6,7 @@ import type { Course, Program, Section, Semester } from '../../shared/types.ts';
 import { useHierarchy } from '../components/HierarchyDialogs.tsx';
 import { PageHeader, SectionTitle } from '../components/layout/AppShell.tsx';
 import { Button, LinkButton } from '../components/ui/Button.tsx';
-import { Alert, EmptyState, ErrorState, PageLoader, Panel } from '../components/ui/Feedback.tsx';
+import { Alert, Badge, EmptyState, ErrorState, PageLoader, Panel } from '../components/ui/Feedback.tsx';
 import { Field, Input } from '../components/ui/Form.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { api, errorMessage, qs } from '../lib/api.ts';
@@ -168,6 +168,8 @@ function DashboardContent({ d }: { d: DashboardData }) {
         </Panel>
       )}
 
+      <WorkloadPreview courses={d.courses} />
+
       <section className="mt-10" aria-labelledby="courses-h">
         <SectionTitle
           id="courses-h"
@@ -292,6 +294,71 @@ function ActivityBars({ activity }: { activity: DashboardData['activity'] }) {
         />
       ))}
     </div>
+  );
+}
+
+function WorkloadPreview({ courses }: { courses: DashboardData['courses'] }) {
+  const upcoming = courses.filter((course) => course.examPlan?.status === 'upcoming' && course.examPlan.days.length > 0);
+  if (upcoming.length === 0) return null;
+
+  return (
+    <section className="mt-10" aria-labelledby="workload-h">
+      <SectionTitle id="workload-h">Current seven-day plan</SectionTitle>
+      <p className="-mt-2 mb-4 max-w-3xl text-[13px] text-muted">
+        Scheduled reviews and planned new cards based on what remains now. Future ratings can move later review dates, so this is a current plan rather than a guarantee.
+      </p>
+      <ul className="flex flex-col gap-3">
+        {upcoming.map((course) => {
+          const plan = course.examPlan!;
+          const nextLearningDay = plan.days.slice(1).find((day) => day.learn > 0);
+          const studyAheadSize = (plan.days[0]?.total ?? 0) + (nextLearningDay?.learn ?? 0);
+          return (
+            <li key={course.id}>
+              <Panel as="article" className="overflow-hidden p-0">
+                <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+                  <span className="size-2.5 shrink-0 rounded-[3px] bg-[var(--course)]" style={courseVars(course.color)} aria-hidden />
+                  <Link to={`/courses/${course.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold hover:underline">
+                    {course.title}
+                  </Link>
+                  <span className="inline-flex items-center gap-1 text-xs text-muted">
+                    <CalendarDays className="size-3.5" aria-hidden />
+                    Exam {formatDate(course.examDate!, { day: 'numeric', month: 'short' })}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[700px] grid-cols-7 divide-x divide-border">
+                    {plan.days.map((day, index) => (
+                      <div key={day.date} className={cn('min-h-28 px-3 py-3', index === 0 && 'bg-primary-soft/55')}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-muted">{index === 0 ? 'Today' : formatDate(day.date, { weekday: 'short' })}</p>
+                          {day.heavy && <Badge tone="warning">Heavy</Badge>}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted tabular-nums">{formatDate(day.date, { day: 'numeric', month: 'short' })}</p>
+                        <p className={cn('mt-2 text-xl font-semibold tabular-nums', day.total > 0 ? 'text-text' : 'text-muted')}>{day.total}</p>
+                        <p className="mt-0.5 text-xs text-muted tabular-nums">{day.learn} learn · {day.revise} revise</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+                  <p className="max-w-2xl text-xs text-muted">
+                    Learning cards early reduces later learn counts. Scheduled ratings can add or move future reviews.
+                  </p>
+                  {nextLearningDay && (
+                    <LinkButton
+                      size="sm"
+                      to={`/study/new${qs({ course: course.id, mode: 'scheduled', size: studyAheadSize, includeNew: true })}`}
+                    >
+                      Learn ahead
+                    </LinkButton>
+                  )}
+                </div>
+              </Panel>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

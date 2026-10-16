@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { addDays, localDateOf } from '../../shared/dates.ts';
+import { localDateOf } from '../../shared/dates.ts';
+import { examReviewDeadline } from '../../shared/exam-planner.ts';
 import { createQueue, progressOf, rate as queueRate, relax as queueRelax, selectNext, clampMaxAttempts, type QueueEntry, type QueueState } from '../../shared/queue.ts';
 import { seededShuffle } from '../../shared/random.ts';
 import { isRating, isWeakRating, type Rating, type StudyMode } from '../../shared/ratings.ts';
@@ -734,7 +735,7 @@ export function rateCard(ctx: Ctx, id: string, input: unknown): RateResponse {
       const timeZone = snap.timeZone ?? getSettings(ctx).timeZone;
       const exam = db.prepare('SELECT exam_date FROM courses WHERE id = ?').get(cardRow.course_id) as { exam_date: string | null } | undefined;
       const reviewDay = localDateOf(reviewedAt, timeZone);
-      const maxDueDate = exam?.exam_date && exam.exam_date > reviewDay ? addDays(exam.exam_date, -1) : undefined;
+      const maxDueDate = exam?.exam_date ? examReviewDeadline(exam.exam_date, reviewDay) : undefined;
       scheduleAfter = scheduler.next({
         previous: before,
         rating,

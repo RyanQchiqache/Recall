@@ -83,11 +83,11 @@ The searchable offline How-to page is complete. The following parts remain:
 
 ### 7. Seven-day workload preview
 
-- [ ] Show scheduled reviews and planned new cards for each of the next seven days, grouped by course.
-- [ ] Call it the **current plan**, not a guaranteed prediction, because future ratings change later dates.
-- [ ] Highlight unusually heavy days with restrained semantic styling.
-- [ ] Allow studying some cards early and explain how counts will change.
-- [ ] Keep the exam buffer and reviews-before-exam rules consistent with the daily planner.
+- [x] Show scheduled reviews and planned new cards for each of the next seven days, grouped by course.
+- [x] Call it the **current plan**, not a guaranteed prediction, because future ratings change later dates.
+- [x] Highlight unusually heavy days with restrained semantic styling.
+- [x] Allow studying some cards early and explain how counts will change.
+- [x] Keep the exam buffer and reviews-before-exam rules consistent with the daily planner.
 
 ### 8. Command palette and shortcut help
 
