@@ -50,7 +50,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
   const body = (req: Req) => (req.body ?? {}) as Record<string, unknown>;
 
   // ----- System & settings -----
-  get('/api/health', () => ({ ok: true, version: APP_VERSION }));
+  // GET /api/health and the startup/shutdown endpoints are registered in startup.ts.
   get('/api/system', () => ({
     appVersion: APP_VERSION,
     schemaVersion: currentSchemaVersion(ctx.db),

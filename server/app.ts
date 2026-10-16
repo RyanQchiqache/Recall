@@ -3,13 +3,14 @@ import path from 'node:path';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { AppConfig } from './config.ts';
+import { APP_VERSION, PROJECT_ROOT, type AppConfig } from './config.ts';
 import type { Ctx } from './context.ts';
 import { openDatabase, type DB } from './db/connection.ts';
 import { AppError } from './lib/util.ts';
 import { registerRoutes } from './routes.ts';
 import { cleanupTmp } from './services/backup.ts';
 import { mediaPath, mimeForFilename } from './services/media.ts';
+import { registerStartup, Startup } from './startup.ts';
 
 export interface BuildOptions {
   config: AppConfig;
@@ -18,11 +19,18 @@ export interface BuildOptions {
   logger?: boolean;
   db?: DB;
   log?: (msg: string) => void;
+  /** Startup state machine; when omitted the app starts out ready (tests, embedding). */
+  startup?: Startup;
+  /** POST /api/system/shutdown calls this after replying; defaults to closing the app. */
+  onShutdown?: () => void;
+  /** Opens the log file for POST /api/startup/open-log. */
+  openLog?: (file: string) => void;
 }
 
 export interface BuiltApp {
   app: FastifyInstance;
   ctx: Ctx;
+  startup: Startup;
   close: () => Promise<void>;
 }
 
@@ -107,7 +115,8 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Cross-Origin-Resource-Policy', 'same-origin');
     reply.header('Cross-Origin-Opener-Policy', 'same-origin');
-    if (!config.dev) reply.header('Content-Security-Policy', PROD_CSP);
+    // Routes with their own policy (media, the startup status page) keep it.
+    if (!config.dev && !reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', PROD_CSP);
     return payload;
   });
 
@@ -129,6 +138,14 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
     reply.code(500).send({ error: { code: 'internal', message: 'Something went wrong on the local server. Details are in the terminal.' } });
   });
 
+  const startup =
+    opts.startup ??
+    new Startup(
+      { projectRoot: PROJECT_ROOT, distDir: config.distDir, dataDir: config.dataDir, port: config.port, version: APP_VERSION, logPath: config.logPath ?? '', dev: config.dev },
+      'ready',
+    );
+  registerStartup(app, { startup, onShutdown: opts.onShutdown ?? (() => void close()), openLog: opts.openLog });
+
   await app.register(fastifyMultipart, { limits: { files: 1, fileSize: 1024 * 1024 * 1024, fields: 10 } });
 
   // Uploaded images, served from the data directory.
@@ -148,7 +165,9 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
   registerRoutes(app, ctx);
 
   const indexHtml = path.join(config.distDir, 'index.html');
-  if (!config.dev && fs.existsSync(indexHtml)) {
+  // Registered even before dist/ exists: the startup rebuild may create it later. The root is a path,
+  // resolved per request, so a dist swap (rename) is picked up without restarting.
+  if (!config.dev) {
     await app.register(fastifyStatic, {
       root: config.distDir,
       prefix: '/',
@@ -176,12 +195,14 @@ export async function buildApp(opts: BuildOptions): Promise<BuiltApp> {
     reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
   });
 
-  return {
-    app,
-    ctx,
-    close: async () => {
+  let closing: Promise<void> | null = null;
+  async function close() {
+    closing ??= (async () => {
       await app.close();
       if (!opts.db) db.close();
-    },
-  };
+    })();
+    return closing;
+  }
+
+  return { app, ctx, startup, close };
 }
