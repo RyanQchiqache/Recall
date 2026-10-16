@@ -207,6 +207,12 @@ describe('launcher', () => {
     // The next launch finds it through server.json.
     expect(await launch(e.opts)).toMatchObject({ action: 'reused', port: fallback });
     expect(e.spawned).toHaveLength(1);
+    // Once the configured port is free again, a restart moves Recall back to it.
+    await new Promise<void>((r) => other.close(() => r()));
+    writeDist(e.w.distDir, 'newer');
+    expect(await launch(e.opts)).toMatchObject({ action: 'started', port });
+    expect(await isPortFree(fallback)).toBe(true);
+    expect(readServerInfo(e.w.dataDir)?.port).toBe(port);
   });
 
   it('reports a clear error when no port is free', async () => {

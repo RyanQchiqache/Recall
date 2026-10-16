@@ -273,7 +273,8 @@ async function launchLocked(o: LaunchOptions): Promise<LaunchResult | Crash> {
         return { action: 'failed', reason: `The running Recall (pid ${decision.pid}) could not be stopped. Restart your computer or end it in Activity Monitor, then open Recall again.` };
       }
       removeServerInfo(o.dataDir, decision.pid);
-      return start(o, decision.port);
+      // A server that had to use a fallback port moves back to the configured port when it is free again.
+      return start(o, decision.port !== o.port && (await isPortFree(o.port)) ? o.port : decision.port);
     }
     case 'start':
       if (decision.port !== o.port) o.say(`Port ${o.port} is in use: ${decision.reason}.`);
