@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COURSE_COLORS, COURSE_ICONS, SECTION_KINDS } from '../../shared/catalog.ts';
+import { examReviewDeadline } from '../../shared/exam-planner.ts';
 import type {
   Counts,
   Crumb,
@@ -301,7 +302,8 @@ export function updateItem(ctx: Ctx, level: Level, id: string, input: Record<str
     sets.push(`${COLUMN_MAP[k]} = ?`);
     vals.push(v);
   }
-  if (level === 'course' && fields.examDate !== undefined && fields.examDate !== existing.exam_date) {
+  const examDateChanged = level === 'course' && fields.examDate !== undefined && fields.examDate !== existing.exam_date;
+  if (examDateChanged) {
     sets.push('exam_set_at = ?');
     vals.push(fields.examDate ? nowIso(ctx) : null);
   }
@@ -318,6 +320,24 @@ export function updateItem(ctx: Ctx, level: Level, id: string, input: Record<str
   sets.push('updated_at = ?');
   vals.push(nowIso(ctx));
   ctx.db.prepare(`UPDATE ${def.table} SET ${sets.join(', ')} WHERE id = ?`).run(...vals, id);
+  if (examDateChanged && typeof fields.examDate === 'string') {
+    const deadline = examReviewDeadline(fields.examDate, today(ctx));
+    if (deadline) {
+      ctx.db
+        .prepare(
+          `UPDATE card_schedules
+           SET due_date = ?, updated_at = ?
+           WHERE due_date > ?
+             AND card_id IN (
+               SELECT cards.id
+               FROM cards
+               JOIN sections ON sections.id = cards.section_id
+               WHERE sections.course_id = ?
+             )`,
+        )
+        .run(deadline, nowIso(ctx), deadline, id);
+    }
+  }
   return getItem(ctx, level, id);
 }
 

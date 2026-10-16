@@ -47,6 +47,11 @@ describe('seven-day exam workload', () => {
     insert.run(dueAfterExam, '2026-11-01', timestamp, timestamp, timestamp);
     await app.api('PATCH', `/api/courses/${hierarchy.course.id}`, { examDate: '2026-10-20' });
 
+    const cappedSchedule = app.ctx.db
+      .prepare('SELECT due_date FROM card_schedules WHERE card_id = ?')
+      .get(dueAfterExam) as { due_date: string };
+    expect(cappedSchedule.due_date).toBe('2026-10-19');
+
     const dashboard = (await app.api('GET', '/api/dashboard')).body;
     const course = dashboard.courses.find((item: { id: string }) => item.id === hierarchy.course.id);
     expect(course.examPlan.learnToday).toBe(course.examPlan.days[0].learn);
