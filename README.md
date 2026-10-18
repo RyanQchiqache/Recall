@@ -5,83 +5,11 @@ A fast, private flashcard workspace for university study, running entirely on yo
 You organize **study programs → semesters → courses → sections → cards**, create basic/reverse, cloze, image-occlusion and reusable-template cards with Markdown, LaTeX math, code and local images, and test yourself in configurable sessions. Your four personal ratings (**Bad, Good, Very good, Perfect**) decide which cards come back within a session and when each card is due again.
 
 - **No AI, no cloud, no account, no telemetry.** Nothing is ever sent anywhere.
-
 - **Works offline.** After the one-time install and build, the app needs no internet connection.
-
 - **Your data is a single SQLite database** in a folder you control, plus your uploaded images.
-
 - **Plans toward your exams.** Set an exam date on a course to get a daily learn-and-revise plan plus plain-language readiness on the dashboard.
 
 ![Dashboard](docs/screenshots/03-dashboard.png)
-
----
-
-## Desktop application roadmap (planned)
-
-> **Development roadmap — not yet released.** Recall currently runs as a local Node.js application using the launchers in [Everyday use](#3-everyday-use-offline). The installers, native application window, app menus, version display and update controls below are **proposed work**, not features that can currently be downloaded. The existing source-based workflow remains supported during the transition.
-
-### Goal: install Recall like a normal application
-
-Provide a consistent, first-class desktop experience on Windows, macOS and Linux while keeping all flashcards, schedules and media stored locally. Users should be able to download one installer/package, open Recall from their operating system's application launcher, and study without installing Node.js, using a terminal, creating an account or connecting to the internet.
-
-| Platform | Proposed release artifacts | OS integration |
-| --- | --- | --- |
-| Windows (x64 initially) | `Recall-Setup-<version>.exe` | Start Menu entry, desktop shortcut option, proper uninstall, app icon |
-| macOS (Apple Silicon and Intel, subject to CI support) | `Recall-<version>-mac-<arch>.dmg` | `/Applications` app, Dock icon, native menu, standard app lifecycle |
-| Linux (x64 initially) | `Recall-<version>-linux-x64.AppImage` and optionally `.deb` | Desktop entry, application icon, standard per-user data directories |
-
-Supported operating-system releases, CPU architectures, signing status and download availability must be stated on each actual release; package names above are **targets**, not existing files.
-
-### Proposed desktop approach
-
-- **Packaging:** evaluate **Electron + electron-builder** as the initial implementation because Recall already uses React, Node.js, Fastify and `better-sqlite3`. Validate bundled native-module builds on each target platform before committing to this choice. Tauri is an alternative but requires an explicit strategy for the Node backend.
-- **Preserve existing code:** reuse the React UI, scheduling engine, Fastify API, SQLite schema, backups and existing migration logic. Add an isolated desktop entry point instead of rewriting business logic.
-- **Bundled runtime:** ship the compatible runtime and production frontend with the desktop package. End users must not need `npm ci`, `npm run build` or a separate Node.js installation.
-- **Single instance:** opening Recall twice should focus the existing window and must not spawn duplicate backend servers or simultaneous database writers. Cleanly stop the managed backend when the desktop app quits; handle crash/restart recovery.
-- **Security:** isolate the renderer (`contextIsolation` enabled, `nodeIntegration` disabled), expose only explicitly needed operations through a minimal preload bridge, and validate every IPC request. Never enable unrestricted filesystem or shell access from web content. Retain the existing loopback-only API and its origin/host protections or replace that transport only after equivalent security testing.
-- **Offline-first:** the app must start, study and restore backups with no internet connection. Release checks, if implemented, are optional and must not introduce telemetry or automatic network calls contrary to the privacy promise without explicit user consent and updated documentation.
-
-### Native application experience
-
-A conventional application window should include Recall branding, its own window/taskbar/Dock icon, operating-system-native minimize/maximize/close actions, proper focus and keyboard behavior, and accessible menus. Menu conventions differ between operating systems, so adapt placement rather than forcing an identical bar everywhere.
-
-| Menu | Proposed actions |
-| --- | --- |
-| File / Recall | Settings, export full backup, import/restore backup, quit |
-| Edit | Undo/redo (where supported), cut, copy, paste, select all |
-| View | Zoom in/out/reset, full screen, reload where safe |
-| Window | Minimize, focus main window |
-| Help | Offline guide, keyboard shortcuts, About Recall, check for updates (when available) |
-
-Native menu entries should invoke existing app actions safely and should be disabled when unavailable (for example, no undo operation). A tray/menu-bar resident mode is **optional**, not a prerequisite for the first desktop release, and must make Quit and background activity clear.
-
-### Versioning and About Recall
-
-- Use **Semantic Versioning** (`MAJOR.MINOR.PATCH`) in a single canonical application version (for example, `package.json`) and propagate it into desktop metadata, About Recall, release filenames and Git tags (`v1.0.0`). Do not hard-code inconsistent versions across the UI.
-- Continue using `0.x.y` during prerelease development if appropriate. Reserve **v1.0.0** for a tested stable desktop release; it is **not** the currently verified version.
-- Add **Settings → About Recall** and a native **About Recall** dialog showing: product name/logo, actual installed version, operating system, CPU architecture, a link to the offline Help page, release notes, and an optional update-check button.
-- Distinguish the **application version**, **SQLite schema version**, and **scheduler algorithm identifier** (`recall-heuristic-v1`). These track different compatibility concerns and must not be conflated.
-- Document each release in `CHANGELOG.md`, with migrations and any user-visible changes clearly identified.
-
-### Updates and release distribution
-
-1. Publish installers and checksums as versioned artifacts attached to GitHub Releases (or another explicitly designated release host).
-2. Build and test **separately on Windows, macOS and Linux CI runners**, including native `better-sqlite3` compatibility, opening the app, flashcard study, export/import and clean shutdown.
-3. Make updates **non-destructive**: executable/application files update independently of the user data folder; never overwrite or reset `recall.sqlite`, media or backups. Take a migration snapshot before any schema change.
-4. Start with **manual downloads** and a visible installed-version indicator. Add an opt-in **Check for updates** action once release metadata, signature/integrity verification and rollback/error handling are reliable. Automatic background downloads or installs are not required for v1.0.0.
-5. Investigate code signing and notarization for macOS, Windows signing, and Linux packaging trust. Unsigned first builds may display security warnings and must not be presented as fully trusted installers.
-6. Keep version-specific release notes and a tested upgrade path from earlier versions, plus a documented rollback and recovery procedure. Never downgrade a newer database schema without explicit compatibility support.
-
-### Acceptance criteria for the first stable desktop release
-
-- A fresh user can install, launch and uninstall Recall on each advertised operating system without downloading developer tooling.
-- Closing and reopening Recall retains exactly the same courses, media, study progress and settings; running two windows does not corrupt the database.
-- Native menus and About Recall report the **actual** installed version; release tags, packaged metadata and changelog agree.
-- The packaged application functions offline; no accounts or telemetry are introduced.
-- Existing full backups can be restored into a fresh packaged installation, and users can move data between supported operating systems using the documented export/restore flow.
-- Builds are tested on all advertised platforms and CPU architectures, and release downloads have reproducible version labels and integrity information.
-
-**Implementation note:** This roadmap describes intended capabilities, not a guarantee of feature availability. Update the Quick start and platform-specific instructions when actual packaged installers are released; until then, use the existing launch methods below.
 
 ---
 
@@ -90,29 +18,19 @@ Native menu entries should invoke existing app actions safely and should be disa
 ### 1. Prerequisites (once)
 
 - **Node.js 22.18 or newer.** Node 24 LTS is recommended. Recall's server is TypeScript that Node runs directly, which needs Node ≥ 22.18.
-
   - On macOS with Homebrew: `brew install node@24`. The `node@24` formula is not linked by default, so add it to your PATH (for example in `~/.zshrc`):
-
     ```sh
-
     export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
-
     ```
-
   - Check with `node -v`.
-
 - Internet access is needed **only** for the install step below.
 
 ### 2. Install and build (once, and after updating the code)
 
 ```sh
-
 cd /path/to/flashcard_app
-
 npm ci          # installs exact versions from package-lock.json (needs internet)
-
 npm run build   # type-checks and builds the frontend into dist/
-
 ```
 
 The build step is optional for everyday use: Recall notices a missing or outdated frontend when it starts and rebuilds it itself (see below).
@@ -126,19 +44,14 @@ The build step is optional for everyday use: Recall notices a missing or outdate
 Run this once to create **Recall** and **Stop Recall** in `/Applications` (run it again if you move the project folder):
 
 ```sh
-
 zsh scripts/make-mac-app.sh
-
 ```
 
 Opening **Recall**:
 
 1. Looks for Node.js 22.18 or newer on your PATH and in the usual Homebrew, nvm, fnm and Volta locations. If it finds none, or only an older version, a dialog explains what to install, with an **Open download page** button.
-
 2. Opens the Recall that is already running if it is healthy and current. Opening Recall again never starts a second server.
-
 3. Replaces a running Recall that is out of date, for example one started before you updated the code, or one whose page refers to files it can no longer serve. Otherwise it starts a new one.
-
 4. Opens your browser straight away. While Recall prepares itself you see a small status page (**Starting Recall**, **Rebuilding after an update…**, **Opening Recall**). It switches to the app by itself once everything is ready.
 
 **Stop Recall** shuts Recall down cleanly and confirms with a notification. Everything Recall prints goes to `~/Library/Logs/Recall.log`.
@@ -148,13 +61,9 @@ Opening **Recall**:
 The same launcher is available everywhere:
 
 | | Start or open Recall | Stop Recall |
-
 | --- | --- | --- |
-
-| Windows | double-click `scripts/recall.cmd` (or a shortcut to it) | `scripts/recall.cmd --stop` |
-
+| Windows | double-click `scripts\recall.cmd` (or a shortcut to it) | `scripts\recall.cmd --stop` |
 | Linux / macOS terminal | `scripts/recall.sh` | `scripts/recall.sh --stop` |
-
 | Any platform | `npm run launch` | `npm run launch -- --stop` |
 
 Both scripts find Node.js and explain a missing or too old version. The launcher accepts `--port N`, `--data-dir DIR` and `--no-open`. The server runs in the background, and its log is `recall.log` in the data folder (on macOS, `~/Library/Logs/Recall.log`).
@@ -162,9 +71,7 @@ Both scripts find Node.js and explain a missing or too old version. The launcher
 #### In the foreground: npm start
 
 ```sh
-
 npm start
-
 ```
 
 Then open **http://127.0.0.1:4317**. When started from a terminal, Recall opens your browser automatically. The terminal prints the exact data folder in use. Stop the app with `Ctrl+C`. If the frontend is missing or older than the source, `npm start` rebuilds it too and shows the status page in the meantime. `npm start` does not check for other running copies; use the launcher for that.
@@ -172,15 +79,10 @@ Then open **http://127.0.0.1:4317**. When started from a terminal, Recall opens 
 Options:
 
 | Option | Environment variable | Default |
-
 | --- | --- | --- |
-
 | `--port 5000` | `RECALL_PORT` | `4317` |
-
 | `--data-dir /path/to/folder` | `RECALL_DATA_DIR` | see [Where your data lives](#where-your-data-lives) |
-
 | `--no-open` / `--open` | `RECALL_NO_OPEN=1` | open the browser when run in a terminal |
-
 | `--log-file /path/to/file` | `RECALL_LOG_FILE` | `~/Library/Logs/Recall.log` on macOS, `recall.log` in the data folder elsewhere |
 
 Example: `npm start -- --port 5000 --data-dir ~/Documents/RecallData`
@@ -198,15 +100,10 @@ Open **How to** from the navigation for a fully offline, searchable guide to Rec
 A saved **note** holds the source material and can generate one or more independently scheduled cards. Recall keeps sibling cards from the same note apart within a session so one cannot immediately give away another.
 
 | Type | What it creates |
-
 | --- | --- |
-
 | **Basic** | One front → back card, with an optional separate back → front **Reverse** card. |
-
 | **Cloze** | Text with numbered gaps such as `{{c1::mitochondrion}}`; each number creates a card, and repeated uses of one number are revealed together. |
-
 | **Image occlusion** | A local image with boxes over parts to recall; each box creates a card and can have an answer label. |
-
 | **Template** | Reusable named fields and one or more custom layouts, useful for vocabulary, definitions, theorems or any repeated structure. |
 
 Open **Templates** in the navigation to create or evolve templates. Recall previews the impact of a template change before applying it to existing notes, and removed fields or layouts retain their values and scheduling history so they can be restored.
@@ -216,29 +113,19 @@ Open **Templates** in the navigation to create or evolve templates. Recall previ
 ## Where your data lives
 
 | OS | Default data folder |
-
 | --- | --- |
-
 | macOS | `~/Library/Application Support/Recall` |
-
 | Linux | `$XDG_DATA_HOME/recall`, or `~/.local/share/recall` |
-
 | Windows | `%APPDATA%\Recall` |
 
 Inside it:
 
 ```
-
 recall.sqlite        the database (+ recall.sqlite-wal / -shm while running)
-
 media/               uploaded images, with generated file names
-
 backups/             automatic snapshots (folder configurable in Settings)
-
 tmp/                 short-lived restore/import staging files
-
 server.json          which process and port the running Recall uses (removed when it stops)
-
 ```
 
 The resolved paths are shown in **Settings → Data location** and printed at startup. The folder is outside the source tree and `dist/`, so rebuilding, reinstalling or updating the app never touches your data. The browser's local storage only holds disposable preferences, such as which sidebar groups are expanded. Unsaved card drafts are stored in the database too.
@@ -250,18 +137,12 @@ The resolved paths are shown in **Settings → Data location** and printed at st
 All of these are in **Settings → Backups & import**.
 
 - **Export full backup** downloads a versioned `.zip` with `manifest.json`, `data.json` and `media/`. It contains every program, semester, course, section, note, generated card, template, tag, image, schedule, review event, study session (including an open one), settings and unsaved drafts.
-
-- **Restore or import…** first shows a preview with counts, schema version and warnings. The archive is extracted defensively: no path traversal, size and ratio limits, and images are checked by their real file type. The data is then loaded into an empty scratch database to check every reference **before** your live data is touched.
-
+- **Restore or import…** first shows a preview with counts, schema version and warnings. The archive is extracted defensively: no path traversal, size and ratio limits, and images are checked by their real file type. The data is then loaded into an empty scratch database to check every reference *before* your live data is touched.
   - A **full backup** replaces everything, all-or-nothing, after explicit confirmation. A `pre-restore-…` snapshot of your current data is taken first.
-
-  - A **course package** (exported from a course page with ⋯ → **Export course package**) is added as a **new** course in a semester you choose, with new IDs. Its manifest states what it includes: content, images, and optionally schedules. Review history and settings are not included.
-
+  - A **course package** (exported from a course page with ⋯ → *Export course package*) is added as a **new** course in a semester you choose, with new IDs. Its manifest states what it includes: content, images, and optionally schedules. Review history and settings are not included.
   - Backups from a newer, unsupported format or schema version are rejected safely.
-
 - **Automatic snapshots** use SQLite's online backup API, so they are always consistent and never copy a live file unsafely. By default one is taken every 24 hours while the app runs, and the newest 10 are kept. The folder, interval and retention are configurable. The last success or error is shown. Snapshots are also taken before database migrations and before every full restore. Any snapshot can be restored from the same screen.
-
-- **CSV** (course page ⋯ → **Import cards from CSV** / **Export cards as CSV**). The import maps columns (front, back, section, tags, source, explanation, hint and type) and supports basic, reverse and cloze notes. It handles quoted fields, multi-line text and UTF-8, shows per-row errors in a preview, creates missing sections only after you confirm, and lets you skip duplicates. Image-occlusion and template notes are exported as readable text but need a course package or full backup for a lossless move. CSV protects against spreadsheet formula injection and is a convenience format, **not** a complete backup.
+- **CSV** (course page ⋯ → *Import cards from CSV* / *Export cards as CSV*). The import maps columns (front, back, section, tags, source, explanation, hint and type) and supports basic, reverse and cloze notes. It handles quoted fields, multi-line text and UTF-8, shows per-row errors in a preview, creates missing sections only after you confirm, and lets you skip duplicates. Image-occlusion and template notes are exported as readable text but need a course package or full backup for a lossless move. CSV protects against spreadsheet formula injection and is a convenience format, **not** a complete backup.
 
 > **Important:** snapshots live on the same disk as your data and do **not** protect against disk failure or loss of the computer. Regularly copy an **exported full backup** to a separate drive or another safe place.
 
@@ -274,51 +155,34 @@ All of these are in **Settings → Backups & import**.
 Choose a scope: one or more sections, one or more courses, or a whole semester. Then choose a mode, a size (10/20/30/40/50 or a custom number of **unique** cards), an order (oldest-due first, random with a stored seed, or weakest first) and optional filters (tags, bookmarked, weak, new/due…). The summary shows the due/new/not-yet-due breakdown before you start. If fewer cards are eligible than requested, Recall says so (for example "18 cards available") and offers to start with those. It never duplicates cards to fill a session.
 
 | Mode | Selection | Changes long-term schedule? |
-
 | --- | --- | --- |
-
 | Scheduled review | Due cards (oldest first), then new cards if "Include new cards" is on | Yes — the **first** rating of each card per session |
-
 | Practice | Any matching cards, even if not due | No |
-
 | Test once | Any matching cards; one attempt each; you can type a draft answer before revealing | No |
 
 ### The four ratings
 
 | Key | Rating | Meaning | Within the session |
-
 | --- | --- | --- | --- |
-
 | 1 | **Bad** | I did not know it or got it wrong | Returns after at least 2 other card attempts |
-
 | 2 | **Good** | I partly knew it or needed significant effort | Returns after at least 5 other card attempts |
-
 | 3 | **Very good** | I answered correctly with reasonable confidence | Done for this session |
-
 | 4 | **Perfect** | I answered immediately and confidently | Done for this session |
 
 - Each card can be attempted at most 3 times per session; you can set 1–10 before starting. A card still rated Bad or Good on its last attempt is marked **Needs another session**, not "learned".
-
 - If the only cards left are still inside their repeat gap, the screen offers **Review remaining cards now** instead of making you wait. One-card sessions work the same way.
-
 - Every rating is saved immediately. **Undo** (`U` or `Ctrl/⌘+Z`) reverses the last rating atomically: the event, attempt counter, queue, schedule and progress all return to their previous state. A reload, browser restart or server restart resumes on the exact same card, in the same order, with the answer still revealed if it was.
-
 - Only one session can be open at a time. A second tab picks up the same session, and revision checks plus idempotency keys stop double ratings or stale tabs from corrupting it.
 
 ### Long-term schedule (`recall-heuristic-v1`)
 
 This is a deliberately simple, transparent rule of this app. It is **not** FSRS, SM-2, Vaia's algorithm or a calibrated memory model. Only the first rating of a card in a scheduled review session counts.
 
-| First rating | New card | Previously reviewed card, previous interval **I** days |
-
+| First rating | New card | Previously reviewed card, previous interval *I* days |
 | --- | --- | --- |
-
 | Bad | 1 day | 1 day (counts as a lapse) |
-
 | Good | 2 days | max(2, ⌈I × 1.2⌉) |
-
 | Very good | 4 days | max(4, ⌈I × 2⌉) |
-
 | Perfect | 7 days | max(7, ⌈I × 3⌉) |
 
 Intervals are capped at 365 days. All values are adjustable in Settings, and changes only apply to future reviews. Each session stores a snapshot of the settings it was started with. Due dates are calendar dates in your configured timezone (default `Europe/Berlin`). A card becomes due at local midnight, and daylight-saving changes never shift a due date.
@@ -330,13 +194,9 @@ For a course with an upcoming exam, the next due date is capped at the day befor
 Add or clear an exam date in the course settings. The dashboard then recalculates the course plan every day from the cards that remain:
 
 - **Learn today** spreads new cards across the available days, normally keeping the final three days before the exam for review only (or fewer when the exam is close).
-
 - **Revise today** is the number of cards currently due. **Study plan** opens the normal session builder prefilled with exactly the due cards and today’s new-card allowance.
-
 - **Current seven-day plan** shows those same learn and revise calculations for the coming week, grouped by course. It includes currently scheduled reviews and clearly notes that future ratings can move later dates.
-
 - **Learned** means a card has been studied at least once. **Answering well** means its latest scheduled-review rating was Very good or Perfect. These are personal confidence signals, not predicted exam scores.
-
 - **On track / Behind by N cards** compares cards learned so far with the even pace from when the exam date was set. If a day is skipped, tomorrow’s plan automatically spreads what remains over fewer days.
 
 After the date passes, the dashboard says **Exam passed** and offers to clear the date.
@@ -344,13 +204,9 @@ After the date passes, the dashboard says **Exam passed** and offers to clear th
 ### Keyboard shortcuts
 
 | Where | Keys |
-
 | --- | --- |
-
 | Anywhere | `/` search |
-
 | Card editor | `Ctrl/⌘+Enter` save · `Ctrl/⌘+Shift+Enter` save & add next · `Ctrl/⌘+B` / `Ctrl/⌘+I` bold/italic |
-
 | Study | `Space`/`Enter` reveal · `1`–`4` rate · `H` hint · `U` undo · `P` or `Esc` pause · `R` review remaining cards now |
 
 Shortcuts are ignored while you type in a text field. `Esc` first leaves the field, and pressing it again pauses the session. It never deletes anything.
@@ -362,17 +218,11 @@ Shortcuts are ignored while you type in a text field. `Esc` first leaves the fie
 The statistics page shows honest, descriptive numbers for any program, semester or course and date range. Days are counted in your configured timezone:
 
 - cards due today and new cards
-
 - unique cards and total attempts per day, split by mode
-
 - active study time (pauses excluded; gaps of more than 10 minutes without interaction are not counted)
-
 - first-attempt rating distribution per mode, with denominators
-
 - "First-attempt recall" (Very good or Perfect on the first attempt), kept separate from "Finished after repeats"
-
 - weak sections
-
 - an optional heatmap and streak, which you can hide
 
 Ratings are personal confidence judgements, so Recall never presents them as exam scores or "mastery".
@@ -382,13 +232,9 @@ Ratings are personal confidence judgements, so Recall never presents them as exa
 ## Security and privacy
 
 - The server binds to **127.0.0.1** only, never `0.0.0.0`, so it is not reachable from your network. Binding to a non-loopback address is refused.
-
 - Requests with an unexpected `Host` header are rejected, which protects against DNS rebinding. State-changing requests must come from the app's own origin and carry a custom header, so other websites cannot make your browser modify data.
-
 - Markdown is rendered without raw HTML. Remote images are never fetched (upload them instead). Links open only when you click them. Uploaded files are accepted only if their bytes are real PNG, JPEG, GIF or WebP images, and they get generated file names. A strict Content-Security-Policy is set.
-
 - **Localhost is not a password.** Other programs or other users on the same computer can reach the app. There is no login, because this is a single-user personal tool.
-
 - All JavaScript, CSS, fonts (Inter, JetBrains Mono), KaTeX math fonts and icons are bundled locally. In normal use, no third-party request is ever made, and the automated browser walkthrough checks this.
 
 ---
@@ -396,17 +242,11 @@ Ratings are personal confidence judgements, so Recall never presents them as exa
 ## Development
 
 ```sh
-
 npm run dev         # API on :4317 (auto-restart) + Vite dev server on http://127.0.0.1:5173 (proxied API)
-
 npm test            # Vitest: scheduler, queue, DST dates, sessions, undo/idempotency, backup round-trip, CSV, security, end-to-end API flow
-
 npm run typecheck   # strict TypeScript for frontend and server
-
 npm run build       # typecheck + production build into dist/
-
 npm run screenshots # builds nothing; drives the built app in headless Chromium (needs `npx playwright install chromium` once)
-
 ```
 
 The screenshot walkthrough starts the production server on a temporary data folder. It goes through onboarding, creates a card with an equation, code and an uploaded image, studies with the keyboard (including a reload mid-session), and visits every main screen at 1440 px and 390 px in light and dark mode. It fails on horizontal overflow, console errors or any non-local network request. Output goes to `docs/screenshots/`.
@@ -414,51 +254,29 @@ The screenshot walkthrough starts the production server on a temporary data fold
 ### Architecture
 
 ```
-
 shared/     Pure TypeScript used by server, client and tests
-
   dates.ts       timezone-aware calendar dates (DST-safe), no dependencies
-
   scheduler.ts   recall-heuristic-v1 behind a pluggable Scheduler interface
-
   queue.ts       deterministic in-session repeat queue (gaps, cap, relax)
-
   types.ts       API data shapes
-
 server/     Node.js (TypeScript run natively) + Fastify + better-sqlite3
-
   db/            connection, append-only migrations (pre-migration snapshot)
-
   services/      hierarchy, cards (FTS5 search), sessions, stats, backup, csv, media, drafts, demo
-
   app.ts         host/origin checks, security headers, static SPA, media serving
-
   routes.ts      JSON API under /api
-
   startup.ts     startup state machine: rebuild a stale frontend, status page, health/shutdown
-
   launcher.ts    single-instance launcher (reuse, restart, port fallback, error page, --stop)
-
   launch/        small testable parts: staleness, lock, ports, probes, decisions, status page
-
 src/        React 19 + React Router + TanStack Query + Tailwind CSS 4 + Radix primitives
-
   pages/         Dashboard, Organize, Course, Section, Card editor, Session builder,
-
                  Study, Results, Statistics, Search, Templates, Trash, Settings
-
 tests/      Vitest suites with an injected clock and seeded randomness
-
 scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh, recall.cmd
-
 ```
 
 - **SQLite is the source of truth.** Writes are transactional; foreign keys, indexes for the hierarchy, due dates and full-text search (FTS5); parameterized SQL only; server-side validation with Zod.
-
 - **Sessions snapshot each card's content** when they start, so editing a card elsewhere does not change a running question. The UI shows a note when that happens.
-
 - **Review events are immutable.** Undo marks an event as undone and stores everything needed to restore the previous state.
-
 - Deleting moves items to the **Trash**, with affected counts shown and an Undo toast. Permanent deletion needs a second confirmation. Cards in the open session cannot be deleted until it ends.
 
 ---
@@ -466,39 +284,22 @@ scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh,
 ## Troubleshooting
 
 | Problem | Fix |
-
 | --- | --- |
-
 | The browser shows **Starting Recall** or **Rebuilding after an update…** | This is normal after an update. Recall is preparing the current version, which usually takes under a minute. The page switches to the app by itself. |
-
 | **The update could not be built** | The red box names the problem, and **Show technical details** has the last build output. Your data is not affected. Choose **Open the previous version** to keep studying with the last working build, or fix the problem and choose **Retry**. **Open log** opens the full log, and **Copy details** copies a report (versions, data folder, port, error, build output) to paste into a message. |
-
 | **Recall could not start** (shown by the launcher) | The server stopped before it could open, for example because the database is damaged or a module was built for another Node.js version. The page explains what to do next. Fix the problem, then choose **Retry**. The page closes by itself after 10 minutes without use. |
-
 | A dialog says **Recall needs Node.js 24 to run** | Install Node.js 24 LTS from nodejs.org, or with Homebrew: `brew install node@24`. Then open Recall again. |
-
 | Recall opened on port 4318 (or 4319…) | Another program was using port 4317, so the launcher picked the next free port from 4318–4330 and noted this in the log. Once port 4317 is free again, Recall uses it the next time it starts, for example after **Stop Recall**. If every port is taken, a message says so. Close the other program or use `--port`. |
-
 | **Another Recall launch is still in progress** | A previous launch is still starting. Wait a moment and open Recall again. |
-
 | Where is the log? | macOS: `~/Library/Logs/Recall.log` (opens in Console). Elsewhere: `recall.log` in the data folder. The status page's **Open log** button opens it. |
-
 | `Port 4317 is already in use` (with `npm start`) | Recall is probably already running; open http://127.0.0.1:4317, use the launcher (it reuses or replaces the running copy), or start with `--port 5000`. |
-
 | `SyntaxError` / `Unknown file extension ".ts"` on start | Your Node is too old. Install Node 24 LTS (`node -v` must be ≥ 22.18). Recall.app and the launch scripts check this for you. |
-
 | npm says install scripts were blocked (npm 11) | Allow the native module and rebuild: `npm install-scripts approve better-sqlite3 esbuild && npm rebuild better-sqlite3 esbuild`. This project's `package.json` already allows them. |
-
 | `Could not locate the bindings file` for better-sqlite3 | The native module was built for a different Node version: `npm rebuild better-sqlite3`. |
-
 | The page says "frontend has not been built yet" | Open Recall again (or restart `npm start`), and it builds the frontend itself. You can also run `npm run build`. |
-
 | Blank page or old UI after updating | Open Recall again: the launcher replaces a server that serves an outdated build. If it persists, choose **Stop Recall**, then open Recall again. |
-
 | Dates look a day off | Set your timezone in Settings → Time & scheduling. |
-
 | Restore rejected | The message names the problem (unsupported version, broken references, bad image…). Your current data is untouched. |
-
 | Move data to another computer | Export a full backup, install Recall there, then Settings → Restore. Or copy the whole data folder while Recall is stopped. |
 
 ---
@@ -506,37 +307,24 @@ scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh,
 ## Known limitations
 
 - Single user, single computer. There is no sync or mobile app, by design: a loopback-only server can't safely provide those.
-
 - Manually authored multiple-choice cards and card printing are not included. Basic/reverse, cloze, image-occlusion and template cards each retain independent scheduling state.
-
 - Media files are not deleted when you delete the cards that use them, to keep older snapshots restorable. They are small and stay in `media/`.
-
 - Automatic snapshots contain the database only. Images stay in `media/`, and a full exported backup includes both.
 
 ## Screenshots
 
 | | |
-
 | --- | --- |
-
 | ![Card editor](docs/screenshots/02-card-editor.png) | ![Session builder](docs/screenshots/07-session-builder.png) |
-
 | ![Cloze editor](docs/screenshots/02a-cloze-editor.png) | ![Image occlusion editor](docs/screenshots/02b-occlusion-editor.png) |
-
 | ![Template editor](docs/screenshots/02c-template-editor.png) | ![Card from a template](docs/screenshots/02d-template-card.png) |
-
 | ![Study](docs/screenshots/10-study-answer.png) | ![Results](docs/screenshots/11-results.png) |
-
 | ![Statistics](docs/screenshots/12-statistics.png) | ![Dark mode](docs/screenshots/18-study-dark.png) |
 
 <p>
-
   <img src="docs/screenshots/20-mobile-dashboard.png" width="200" alt="Mobile dashboard" />
-
   <img src="docs/screenshots/24-mobile-study.png" width="200" alt="Mobile study" />
-
   <img src="docs/screenshots/23-mobile-section.png" width="200" alt="Mobile section" />
-
 </p>
 
 Interface inspired in broad strokes by common flashcard study products. All branding, scheduling rules and implementation are original to this project.
