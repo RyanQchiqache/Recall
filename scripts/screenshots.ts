@@ -27,10 +27,11 @@ const server = spawn(process.execPath, ['server/index.ts', '--data-dir', dataDir
 server.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`));
 
 async function waitForServer() {
-  for (let i = 0; i < 100; i++) {
+  // The server answers at once but may first rebuild an outdated frontend; wait until it is ready.
+  for (let i = 0; i < 1200; i++) {
     try {
       const r = await fetch(`${BASE}/api/health`);
-      if (r.ok) return;
+      if (r.ok && (await r.json()).state === 'ready') return;
     } catch {
       /* not up yet */
     }

@@ -18,6 +18,8 @@ export interface AppConfig {
   distDir: string;
   /** Extra origins allowed to send mutations (e.g. the Vite dev server). */
   extraOrigins: string[];
+  /** Log file shown by the startup page's "Open log". */
+  logPath?: string;
 }
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -33,6 +35,12 @@ export function defaultDataDir(): string {
     default:
       return path.join(process.env.XDG_DATA_HOME ?? path.join(home, '.local', 'share'), 'recall');
   }
+}
+
+/** Default log file: ~/Library/Logs/Recall.log on macOS (where Console.app looks), recall.log in the data dir elsewhere. */
+export function defaultLogPath(dataDir: string): string {
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Logs', 'Recall.log');
+  return path.join(path.resolve(dataDir), 'recall.log');
 }
 
 function argValue(argv: string[], name: string): string | undefined {
@@ -69,7 +77,8 @@ export function loadConfig(argv: string[] = process.argv.slice(2), env = process
     host,
     port,
     dev,
-    distDir: path.join(PROJECT_ROOT, 'dist'),
+    distDir: path.resolve(argValue(argv, '--dist-dir') ?? env.RECALL_DIST_DIR ?? path.join(PROJECT_ROOT, 'dist')),
     extraOrigins: dev ? ['http://127.0.0.1:5173', 'http://localhost:5173'] : [],
+    logPath: path.resolve(argValue(argv, '--log-file') ?? env.RECALL_LOG_FILE ?? defaultLogPath(dataDir)),
   };
 }

@@ -33,15 +33,48 @@ npm ci          # installs exact versions from package-lock.json (needs internet
 npm run build   # type-checks and builds the frontend into dist/
 ```
 
+The build step is optional for everyday use: Recall notices a missing or outdated frontend when it starts and rebuilds it itself (see below).
+
 `better-sqlite3` ships prebuilt binaries for Node 22/24 on macOS, Linux and Windows. If npm reports that install scripts were blocked, see [Troubleshooting](#troubleshooting).
 
 ### 3. Everyday use (offline)
+
+#### macOS: Recall.app
+
+Run this once to create **Recall** and **Stop Recall** in `/Applications` (run it again if you move the project folder):
+
+```sh
+zsh scripts/make-mac-app.sh
+```
+
+Opening **Recall**:
+
+1. Looks for Node.js 22.18 or newer on your PATH and in the usual Homebrew, nvm, fnm and Volta locations. If it finds none, or only an older version, a dialog explains what to install, with an **Open download page** button.
+2. Opens the Recall that is already running if it is healthy and current. Opening Recall again never starts a second server.
+3. Replaces a running Recall that is out of date, for example one started before you updated the code, or one whose page refers to files it can no longer serve. Otherwise it starts a new one.
+4. Opens your browser straight away. While Recall prepares itself you see a small status page (**Starting Recall**, **Rebuilding after an update…**, **Opening Recall**). It switches to the app by itself once everything is ready.
+
+**Stop Recall** shuts Recall down cleanly and confirms with a notification. Everything Recall prints goes to `~/Library/Logs/Recall.log`.
+
+#### Windows, Linux and terminals
+
+The same launcher is available everywhere:
+
+| | Start or open Recall | Stop Recall |
+| --- | --- | --- |
+| Windows | double-click `scripts\recall.cmd` (or a shortcut to it) | `scripts\recall.cmd --stop` |
+| Linux / macOS terminal | `scripts/recall.sh` | `scripts/recall.sh --stop` |
+| Any platform | `npm run launch` | `npm run launch -- --stop` |
+
+Both scripts find Node.js and explain a missing or too old version. The launcher accepts `--port N`, `--data-dir DIR` and `--no-open`. The server runs in the background, and its log is `recall.log` in the data folder (on macOS, `~/Library/Logs/Recall.log`).
+
+#### In the foreground: npm start
 
 ```sh
 npm start
 ```
 
-Then open **http://127.0.0.1:4317**. When started from a terminal, Recall opens your browser automatically. The terminal prints the exact data folder in use. Stop the app with `Ctrl+C`.
+Then open **http://127.0.0.1:4317**. When started from a terminal, Recall opens your browser automatically. The terminal prints the exact data folder in use. Stop the app with `Ctrl+C`. If the frontend is missing or older than the source, `npm start` rebuilds it too and shows the status page in the meantime. `npm start` does not check for other running copies; use the launcher for that.
 
 Options:
 
@@ -50,6 +83,7 @@ Options:
 | `--port 5000` | `RECALL_PORT` | `4317` |
 | `--data-dir /path/to/folder` | `RECALL_DATA_DIR` | see [Where your data lives](#where-your-data-lives) |
 | `--no-open` / `--open` | `RECALL_NO_OPEN=1` | open the browser when run in a terminal |
+| `--log-file /path/to/file` | `RECALL_LOG_FILE` | `~/Library/Logs/Recall.log` on macOS, `recall.log` in the data folder elsewhere |
 
 Example: `npm start -- --port 5000 --data-dir ~/Documents/RecallData`
 
@@ -78,6 +112,7 @@ recall.sqlite        the database (+ recall.sqlite-wal / -shm while running)
 media/               uploaded images, with generated file names
 backups/             automatic snapshots (folder configurable in Settings)
 tmp/                 short-lived restore/import staging files
+server.json          which process and port the running Recall uses (removed when it stops)
 ```
 
 The resolved paths are shown in **Settings → Data location** and printed at startup. The folder is outside the source tree and `dist/`, so rebuilding, reinstalling or updating the app never touches your data. The browser's local storage only holds disposable preferences, such as which sidebar groups are expanded. Unsaved card drafts are stored in the database too.
@@ -216,11 +251,14 @@ server/     Node.js (TypeScript run natively) + Fastify + better-sqlite3
   services/      hierarchy, cards (FTS5 search), sessions, stats, backup, csv, media, drafts, demo
   app.ts         host/origin checks, security headers, static SPA, media serving
   routes.ts      JSON API under /api
+  startup.ts     startup state machine: rebuild a stale frontend, status page, health/shutdown
+  launcher.ts    single-instance launcher (reuse, restart, port fallback, error page, --stop)
+  launch/        small testable parts: staleness, lock, ports, probes, decisions, status page
 src/        React 19 + React Router + TanStack Query + Tailwind CSS 4 + Radix primitives
   pages/         Dashboard, Organize, Course, Section, Card editor, Session builder,
                  Study, Results, Statistics, Search, Trash, Settings
 tests/      Vitest suites with an injected clock and seeded randomness
-scripts/    screenshots.ts (Playwright walkthrough)
+scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh, recall.cmd
 ```
 
 - **SQLite is the source of truth.** Writes are transactional; foreign keys, indexes for the hierarchy, due dates and full-text search (FTS5); parameterized SQL only; server-side validation with Zod.
@@ -234,12 +272,19 @@ scripts/    screenshots.ts (Playwright walkthrough)
 
 | Problem | Fix |
 | --- | --- |
-| `Port 4317 is already in use` | Recall is probably already running; open http://127.0.0.1:4317. Or start with `--port 5000`. |
-| `SyntaxError` / `Unknown file extension ".ts"` on start | Your Node is too old. Install Node 24 LTS (`node -v` must be ≥ 22.18). |
+| The browser shows **Starting Recall** or **Rebuilding after an update…** | This is normal after an update. Recall is preparing the current version, which usually takes under a minute. The page switches to the app by itself. |
+| **The update could not be built** | The red box names the problem, and **Show technical details** has the last build output. Your data is not affected. Choose **Open the previous version** to keep studying with the last working build, or fix the problem and choose **Retry**. **Open log** opens the full log, and **Copy details** copies a report (versions, data folder, port, error, build output) to paste into a message. |
+| **Recall could not start** (shown by the launcher) | The server stopped before it could open, for example because the database is damaged or a module was built for another Node.js version. The page explains what to do next. Fix the problem, then choose **Retry**. The page closes by itself after 10 minutes without use. |
+| A dialog says **Recall needs Node.js 24 to run** | Install Node.js 24 LTS from nodejs.org, or with Homebrew: `brew install node@24`. Then open Recall again. |
+| Recall opened on port 4318 (or 4319…) | Another program was using port 4317, so the launcher picked the next free port from 4318–4330 and noted this in the log. Once port 4317 is free again, Recall uses it the next time it starts, for example after **Stop Recall**. If every port is taken, a message says so. Close the other program or use `--port`. |
+| **Another Recall launch is still in progress** | A previous launch is still starting. Wait a moment and open Recall again. |
+| Where is the log? | macOS: `~/Library/Logs/Recall.log` (opens in Console). Elsewhere: `recall.log` in the data folder. The status page's **Open log** button opens it. |
+| `Port 4317 is already in use` (with `npm start`) | Recall is probably already running; open http://127.0.0.1:4317, use the launcher (it reuses or replaces the running copy), or start with `--port 5000`. |
+| `SyntaxError` / `Unknown file extension ".ts"` on start | Your Node is too old. Install Node 24 LTS (`node -v` must be ≥ 22.18). Recall.app and the launch scripts check this for you. |
 | npm says install scripts were blocked (npm 11) | Allow the native module and rebuild: `npm install-scripts approve better-sqlite3 esbuild && npm rebuild better-sqlite3 esbuild`. This project's `package.json` already allows them. |
 | `Could not locate the bindings file` for better-sqlite3 | The native module was built for a different Node version: `npm rebuild better-sqlite3`. |
-| The page says "frontend has not been built yet" | Run `npm run build`, then `npm start`. |
-| Blank page or old UI after updating | Run `npm run build` again and reload the browser. |
+| The page says "frontend has not been built yet" | Open Recall again (or restart `npm start`), and it builds the frontend itself. You can also run `npm run build`. |
+| Blank page or old UI after updating | Open Recall again: the launcher replaces a server that serves an outdated build. If it persists, choose **Stop Recall**, then open Recall again. |
 | Dates look a day off | Set your timezone in Settings → Time & scheduling. |
 | Restore rejected | The message names the problem (unsupported version, broken references, bad image…). Your current data is untouched. |
 | Move data to another computer | Export a full backup, install Recall there, then Settings → Restore. Or copy the whole data folder while Recall is stopped. |

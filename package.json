@@ -12,6 +12,7 @@
     "dev": "concurrently -k -n api,web -c blue,magenta \"node --watch server/index.ts --dev\" \"vite\"",
     "build": "npm run typecheck && vite build",
     "start": "node server/index.ts",
+    "launch": "node server/launcher.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

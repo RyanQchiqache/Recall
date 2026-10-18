@@ -26,13 +26,13 @@ Work through these in roughly this order. Each item should be a separate, tested
 
 ### 1. Reliable application startup
 
-- [ ] Replace the opaque browser launch with a small **Starting Recall** status experience.
-- [ ] Show progress while starting the server or rebuilding after an update.
-- [ ] Detect and restart stale or unhealthy servers automatically.
-- [ ] Do not open the main page until health and current frontend assets are ready.
-- [ ] On failure, offer **Retry**, **Open log** and **Copy details** with a plain-language explanation.
-- [ ] Make repeated launches focus the existing instance instead of starting competing servers.
-- [ ] Test fresh launch, existing server, rebuild, stale assets, port conflict, wrong Node version and build failure.
+- [x] Replace the opaque browser launch with a small **Starting Recall** status experience.
+- [x] Show progress while starting the server or rebuilding after an update.
+- [x] Detect and restart stale or unhealthy servers automatically.
+- [x] Do not open the main page until health and current frontend assets are ready.
+- [x] On failure, offer **Retry**, **Open log** and **Copy details** with a plain-language explanation.
+- [x] Make repeated launches focus the existing instance instead of starting competing servers. (The browser opens the running instance in a tab; an already open tab is not brought to the front.)
+- [x] Test fresh launch, existing server, rebuild, stale assets, port conflict, wrong Node version and build failure.
 
 ### 2. One-click “Study today”
 
