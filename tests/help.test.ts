@@ -12,7 +12,7 @@ describe('offline help content', () => {
   });
 
   it('answers every essential first-version topic', () => {
-    for (const id of ['library-structure', 'create-card', 'drafts', 'study-modes', 'include-new', 'session-size', 'session-order', 'session-filters', 'ratings', 'next-review', 'daily-plan', 'readiness', 'statistics', 'search-cards', 'backup-types', 'restore-safety', 'keyboard-shortcuts']) {
+    for (const id of ['library-structure', 'create-card', 'reverse-cards', 'cloze-cards', 'image-occlusion-cards', 'card-templates', 'drafts', 'study-modes', 'include-new', 'session-size', 'session-order', 'session-filters', 'ratings', 'next-review', 'daily-plan', 'readiness', 'statistics', 'search-cards', 'backup-types', 'restore-safety', 'keyboard-shortcuts']) {
       const item = HELP_ITEMS.find((entry) => entry.id === id);
       expect(item, `missing ${id}`).toBeDefined();
       expect(item?.question.endsWith('?')).toBe(true);

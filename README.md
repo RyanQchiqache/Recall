@@ -2,7 +2,7 @@
 
 A fast, private flashcard workspace for university study, running entirely on your own computer.
 
-You organize **study programs → semesters → courses → sections → cards**, write cards with Markdown, LaTeX math, code and images, and test yourself in configurable sessions. Your four personal ratings (**Bad, Good, Very good, Perfect**) decide which cards come back within a session and when each card is due again.
+You organize **study programs → semesters → courses → sections → cards**, create basic/reverse, cloze, image-occlusion and reusable-template cards with Markdown, LaTeX math, code and local images, and test yourself in configurable sessions. Your four personal ratings (**Bad, Good, Very good, Perfect**) decide which cards come back within a session and when each card is due again.
 
 - **No AI, no cloud, no account, no telemetry.** Nothing is ever sent anywhere.
 - **Works offline.** After the one-time install and build, the app needs no internet connection.
@@ -93,7 +93,20 @@ The database starts empty. The dashboard walks you through creating a program, s
 
 ### Built-in help
 
-Open **How to** from the navigation for a fully offline, searchable guide to Recall. Its question-and-answer topics explain library setup, card creation, session modes and options, the four ratings, exam planning, statistics, organization, settings, backups and keyboard shortcuts. Answers link directly to the relevant screen where useful; no help content is fetched from the internet.
+Open **How to** from the navigation for a fully offline, searchable guide to Recall. Its question-and-answer topics explain library setup, every card type, session modes and options, the four ratings, exam planning, statistics, organization, settings, backups and keyboard shortcuts. Answers link directly to the relevant screen where useful; no help content is fetched from the internet.
+
+### Card types
+
+A saved **note** holds the source material and can generate one or more independently scheduled cards. Recall keeps sibling cards from the same note apart within a session so one cannot immediately give away another.
+
+| Type | What it creates |
+| --- | --- |
+| **Basic** | One front → back card, with an optional separate back → front **Reverse** card. |
+| **Cloze** | Text with numbered gaps such as `{{c1::mitochondrion}}`; each number creates a card, and repeated uses of one number are revealed together. |
+| **Image occlusion** | A local image with boxes over parts to recall; each box creates a card and can have an answer label. |
+| **Template** | Reusable named fields and one or more custom layouts, useful for vocabulary, definitions, theorems or any repeated structure. |
+
+Open **Templates** in the navigation to create or evolve templates. Recall previews the impact of a template change before applying it to existing notes, and removed fields or layouts retain their values and scheduling history so they can be restored.
 
 ---
 
@@ -123,13 +136,13 @@ The resolved paths are shown in **Settings → Data location** and printed at st
 
 All of these are in **Settings → Backups & import**.
 
-- **Export full backup** downloads a versioned `.zip` with `manifest.json`, `data.json` and `media/`. It contains every program, semester, course, section, card, tag, image, schedule, review event, study session (including an open one), settings and unsaved drafts.
+- **Export full backup** downloads a versioned `.zip` with `manifest.json`, `data.json` and `media/`. It contains every program, semester, course, section, note, generated card, template, tag, image, schedule, review event, study session (including an open one), settings and unsaved drafts.
 - **Restore or import…** first shows a preview with counts, schema version and warnings. The archive is extracted defensively: no path traversal, size and ratio limits, and images are checked by their real file type. The data is then loaded into an empty scratch database to check every reference *before* your live data is touched.
   - A **full backup** replaces everything, all-or-nothing, after explicit confirmation. A `pre-restore-…` snapshot of your current data is taken first.
   - A **course package** (exported from a course page with ⋯ → *Export course package*) is added as a **new** course in a semester you choose, with new IDs. Its manifest states what it includes: content, images, and optionally schedules. Review history and settings are not included.
   - Backups from a newer, unsupported format or schema version are rejected safely.
 - **Automatic snapshots** use SQLite's online backup API, so they are always consistent and never copy a live file unsafely. By default one is taken every 24 hours while the app runs, and the newest 10 are kept. The folder, interval and retention are configurable. The last success or error is shown. Snapshots are also taken before database migrations and before every full restore. Any snapshot can be restored from the same screen.
-- **CSV** (course page ⋯ → *Import cards from CSV* / *Export cards as CSV*). The import maps columns (front, back, section, tags, source, explanation, hint) and handles quoted fields, multi-line text and UTF-8. It shows per-row errors in a preview, creates missing sections only after you confirm, and lets you skip duplicates (same normalized front and back in the same section). The export protects against spreadsheet formula injection (`=`, `+`, `-`, `@` are prefixed with `'`), and importing that file again restores the original text. CSV is a convenience format, **not** a complete backup.
+- **CSV** (course page ⋯ → *Import cards from CSV* / *Export cards as CSV*). The import maps columns (front, back, section, tags, source, explanation, hint and type) and supports basic, reverse and cloze notes. It handles quoted fields, multi-line text and UTF-8, shows per-row errors in a preview, creates missing sections only after you confirm, and lets you skip duplicates. Image-occlusion and template notes are exported as readable text but need a course package or full backup for a lossless move. CSV protects against spreadsheet formula injection and is a convenience format, **not** a complete backup.
 
 > **Important:** snapshots live on the same disk as your data and do **not** protect against disk failure or loss of the computer. Regularly copy an **exported full backup** to a separate drive or another safe place.
 
@@ -256,7 +269,7 @@ server/     Node.js (TypeScript run natively) + Fastify + better-sqlite3
   launch/        small testable parts: staleness, lock, ports, probes, decisions, status page
 src/        React 19 + React Router + TanStack Query + Tailwind CSS 4 + Radix primitives
   pages/         Dashboard, Organize, Course, Section, Card editor, Session builder,
-                 Study, Results, Statistics, Search, Trash, Settings
+                 Study, Results, Statistics, Search, Templates, Trash, Settings
 tests/      Vitest suites with an injected clock and seeded randomness
 scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh, recall.cmd
 ```
@@ -294,7 +307,7 @@ scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh,
 ## Known limitations
 
 - Single user, single computer. There is no sync or mobile app, by design: a loopback-only server can't safely provide those.
-- Cards are question/answer only. A reversible front/back option, cloze, multiple choice and image occlusion are possible later additions and would each get their own scheduling state.
+- Manually authored multiple-choice cards and card printing are not included. Basic/reverse, cloze, image-occlusion and template cards each retain independent scheduling state.
 - Media files are not deleted when you delete the cards that use them, to keep older snapshots restorable. They are small and stay in `media/`.
 - Automatic snapshots contain the database only. Images stay in `media/`, and a full exported backup includes both.
 
