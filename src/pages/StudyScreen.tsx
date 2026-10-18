@@ -204,7 +204,7 @@ export function StudyScreen() {
     <div className="flex min-h-dvh flex-col bg-bg" style={courseVars(snap?.courseColor)}>
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-2 px-3 py-2.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2.5 sm:px-6 lg:px-8">
           <IconButton label="Exit session" onClick={() => setDialog('exit')}>
             <X className="size-5" />
           </IconButton>
@@ -227,7 +227,7 @@ export function StudyScreen() {
             </IconButton>
           )}
         </div>
-        <div className="mx-auto max-w-4xl px-3 pb-3 sm:px-6">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-3 sm:px-6 lg:px-8">
           <div
             className="flex h-1.5 w-full gap-[2px] overflow-hidden rounded-full bg-surface-3"
             role="progressbar"
@@ -269,7 +269,7 @@ export function StudyScreen() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         {s.status === 'paused' ? (
           <PausedPanel onResume={() => resume()} onExit={() => setDialog('exit')} busy={busy} />
         ) : s.waiting ? (
@@ -295,8 +295,8 @@ export function StudyScreen() {
           </div>
         ) : s.current && snap ? (
           <>
-            <article className="anim-pop relative overflow-hidden rounded-2xl border border-border bg-surface shadow-card" aria-live="polite" key={slot}>
-              <div className="p-6 sm:p-9">
+            <article className="anim-pop relative mx-auto w-full max-w-4xl min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card" aria-live="polite" key={slot}>
+              <div className="p-5 sm:p-8 lg:p-10">
                 <div className="mb-5 flex flex-wrap items-center gap-2 text-[13px] text-muted">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="size-2 shrink-0 rounded-[3px] bg-[var(--course)]" aria-hidden />

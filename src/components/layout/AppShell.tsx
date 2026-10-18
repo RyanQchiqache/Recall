@@ -75,11 +75,11 @@ export function AppShell() {
         </div>
       )}
 
-      <main id="main" tabIndex={-1} className="min-w-0 focus:outline-none lg:pl-[248px]">
-        <div className="mx-auto w-full max-w-[1160px] px-4 pt-6 pb-24 sm:px-6 lg:px-12 lg:pt-10">
-          <Outlet />
-        </div>
-      </main>
+<main id="main" tabIndex={-1} className="w-full min-w-0 focus:outline-none lg:pl-[248px]">
+  <div className=" mx-auto w-full min-w-0 px-4 pt-6 pb-24 sm:px-6 lg:px-8 lg:pt-10 xl:px-10 2xl:px-12">
+    <Outlet />
+  </div>
+</main>
     </div>
   );
 }
@@ -131,15 +131,27 @@ export function PageHeader({
   return (
     <header className={cn('mb-7', className)}>
       {crumbs}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="flex min-w-0 items-start gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
           {icon}
           <div className="min-w-0">
-            <h1 className="text-[26px] leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-[28px]">{title}</h1>
-            {subtitle && <div className="mt-1 text-sm text-muted">{subtitle}</div>}
+            <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.02em] text-balance sm:text-[28px]">
+              {title}
+            </h1>
+
+            {subtitle && (
+              <div className="mt-1 text-sm text-muted">
+                {subtitle}
+              </div>
+            )}
           </div>
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">
+            {actions}
+          </div>
+        )}
       </div>
     </header>
   );

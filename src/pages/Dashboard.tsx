@@ -202,7 +202,7 @@ function DashboardContent({ d }: { d: DashboardData }) {
             Add a course, then weekly sections and cards.
           </EmptyState>
         ) : (
-          <ul className="grid gap-3 md:grid-cols-2">
+          <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-4">
             {d.courses.map((c) => (
               <li key={c.id}>
                 <CourseCard
