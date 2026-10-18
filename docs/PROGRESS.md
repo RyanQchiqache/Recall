@@ -1,11 +1,12 @@
 # Recall — implementation checklist
 
-Status as of 2026-10-16. See `README.md` for setup and usage.
+Status as of 2026-10-18. See `README.md` for setup and usage.
 
 ## Done
 
 - [x] Local app/API/SQLite, migrations, full hierarchy CRUD, archive, Trash, reorder, move, duplicate and responsive navigation
-- [x] Card editor: Markdown, KaTeX, highlighted code, local images, live preview, server-side drafts, tags, hint, source, explanation, Save & add next and edit-conflict handling
+- [x] Card editor: basic/reverse, cloze, image-occlusion and template notes; Markdown, KaTeX, highlighted code, local images, live preview, drafts, tags, Save & add next and edit-conflict handling
+- [x] Reusable card templates with visible navigation, explicit fields, multiple card layouts, impact previews and history-preserving evolution
 - [x] Search with FTS5 and substring matching, filters and bulk move/tag/bookmark/suspend/delete
 - [x] Session builder with scope, three modes, size, ordering and filters; study screen with reveal, four ratings, repeat queue, attempt cap, Undo, pause/resume and results
 - [x] Transparent scheduler v1 with per-session settings snapshots and DST-safe calendar dates
@@ -16,9 +17,9 @@ Status as of 2026-10-16. See `README.md` for setup and usage.
 - [x] Security: loopback-only bind, Host/Origin/custom-header checks, CSP, upload validation and sanitized Markdown
 - [x] Draft, stale-state, query refresh, onboarding, date validation, delete retry, mobile drawer and empty-section fixes from the previous handoff
 - [x] Frontend assets added by a rebuild are served without causing the former blank-screen failure
-- [x] Permanent fully offline **How to use Recall** page with search, 34 question-and-answer topics, expandable answers and links to relevant screens
-- [x] Tests: 77 passing with clean typecheck and production build
-- [x] Browser walkthrough: 28 desktop/mobile screens in light and dark modes, with no overflow, console errors or third-party requests
+- [x] Permanent fully offline **How to use Recall** page with search, 38 question-and-answer topics, all card types, expandable answers and links to relevant screens
+- [x] Tests: 145 passing with clean typecheck and production build
+- [x] Browser walkthrough: 32 desktop/mobile screens in light and dark modes, including cloze, occlusion and template editors, with no overflow, console errors or third-party requests
 
 ## UX improvements still to build
 
@@ -124,12 +125,12 @@ The searchable offline How-to page is complete. The following parts remain:
 - [ ] Preserve visible focus, logical focus order, reduced motion and non-colour indicators.
 - [ ] Add useful automated accessibility checks while keeping manual checks in the release checklist.
 
-## Larger features for later
+## Larger features
 
-- [ ] Cloze deletion with multiple deletions and a clear preview
-- [ ] Reversible front/back cards with separate scheduling state where appropriate
-- [ ] Image occlusion that remains fully local and is included in media backups
-- [ ] Reusable card templates with explicit fields and safe template evolution
+- [x] Cloze deletion with multiple deletions and a clear preview
+- [x] Reversible front/back cards with separate scheduling state
+- [x] Image occlusion that remains fully local and is included in media backups
+- [x] Reusable card templates with explicit fields and safe template evolution
 - [ ] Manually authored multiple-choice cards
 - [ ] Deck/card printing
 - [ ] Cleanup tool for unreferenced media files without breaking restorable snapshots
