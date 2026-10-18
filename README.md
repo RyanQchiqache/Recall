@@ -316,6 +316,8 @@ scripts/    screenshots.ts (Playwright walkthrough), make-mac-app.sh, recall.sh,
 | | |
 | --- | --- |
 | ![Card editor](docs/screenshots/02-card-editor.png) | ![Session builder](docs/screenshots/07-session-builder.png) |
+| ![Cloze editor](docs/screenshots/02a-cloze-editor.png) | ![Image occlusion editor](docs/screenshots/02b-occlusion-editor.png) |
+| ![Template editor](docs/screenshots/02c-template-editor.png) | ![Card from a template](docs/screenshots/02d-template-card.png) |
 | ![Study](docs/screenshots/10-study-answer.png) | ![Results](docs/screenshots/11-results.png) |
 | ![Statistics](docs/screenshots/12-statistics.png) | ![Dark mode](docs/screenshots/18-study-dark.png) |
 

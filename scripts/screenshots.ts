@@ -101,6 +101,57 @@ async function main() {
   await shot(page, '02-card-editor');
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter');
   await page.waitForURL(/\/sections\//);
+  const ownSection = page.url().match(/\/sections\/([0-9a-f-]+)/)?.[1];
+  if (!ownSection) throw new Error('Could not read the section created during onboarding');
+
+  // Advanced card types: cloze, image occlusion and reusable templates.
+  await page.goto(`${BASE}/cards/new?section=${ownSection}`);
+  await page.getByRole('radio', { name: 'Cloze' }).check({ force: true });
+  await page.locator('#card-cloze').fill('The {{c1::intersection}} divided by the {{c2::union}} gives intersection over union.');
+  await page.getByText('this note makes 2 cards').waitFor();
+  await shot(page, '02a-cloze-editor');
+  await page.getByRole('button', { name: 'Save 2 cards', exact: true }).click();
+  await page.waitForURL(new RegExp(`/sections/${ownSection}$`));
+
+  await page.goto(`${BASE}/cards/new?section=${ownSection}`);
+  await page.getByRole('radio', { name: 'Image occlusion' }).check({ force: true });
+  await page.locator('input[type=file]').first().setInputFiles(imgPath);
+  await page.getByRole('button', { name: 'Add box' }).waitFor();
+  await page.getByRole('button', { name: 'Add box' }).click();
+  await page.getByRole('button', { name: 'Add box' }).click();
+  await page.getByRole('textbox', { name: 'Answer for box 1' }).fill('Prediction box');
+  await page.getByRole('textbox', { name: 'Answer for box 2' }).fill('Ground-truth box');
+  await page.locator('#card-occl-header').fill('Name the hidden bounding box.');
+  await page.getByText('this note makes 2 cards').waitFor();
+  await shot(page, '02b-occlusion-editor');
+  await page.getByRole('button', { name: 'Save 2 cards', exact: true }).click();
+  await page.waitForURL(new RegExp(`/sections/${ownSection}$`));
+
+  await page.goto(`${BASE}/templates/new`);
+  await page.getByRole('heading', { name: 'New template' }).waitFor();
+  await page.locator('#tpl-name').fill('Term and definition');
+  await page.getByRole('textbox', { name: 'Name of field 1' }).fill('Term');
+  await page.getByRole('textbox', { name: 'Name of field 1' }).blur();
+  await page.getByRole('textbox', { name: 'Name of field 2' }).fill('Definition');
+  await page.getByRole('textbox', { name: 'Name of field 2' }).blur();
+  await page.getByRole('button', { name: 'Add card type' }).click();
+  await page.getByRole('textbox', { name: 'Sample value for Term' }).fill('Intersection over union');
+  await page.getByRole('textbox', { name: 'Sample value for Definition' }).fill('Overlap divided by union');
+  await shot(page, '02c-template-editor');
+  await page.getByRole('button', { name: 'Create template' }).click();
+  await page.waitForURL(/\/templates\/[0-9a-f-]+$/);
+  const templateId = page.url().match(/\/templates\/([0-9a-f-]+)$/)?.[1];
+  if (!templateId) throw new Error('Could not read the created template id');
+
+  await page.goto(`${BASE}/cards/new?section=${ownSection}&kind=template&template=${templateId}`);
+  await page.getByRole('heading', { name: 'Create card' }).waitFor();
+  const templateFields = page.locator('textarea[id^=card-field-]');
+  await templateFields.nth(0).fill('Intersection over union');
+  await templateFields.nth(1).fill('Overlap divided by union');
+  await page.getByText('this note makes 2 cards').waitFor();
+  await shot(page, '02d-template-card');
+  await page.getByRole('button', { name: 'Save 2 cards', exact: true }).click();
+  await page.waitForURL(new RegExp(`/sections/${ownSection}$`));
 
   // Demo content for richer screens.
   await api('POST', '/api/demo');
