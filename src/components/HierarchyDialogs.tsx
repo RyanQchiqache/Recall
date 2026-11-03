@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Check } from 'lucide-react';
+import { Check, FileUp, X } from 'lucide-react';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { COURSE_COLORS, COURSE_ICONS, SECTION_KINDS } from '../../shared/catalog.ts';
-import type { Course, ImpactCounts, Level, Program, Section, Semester, TrashType } from '../../shared/types.ts';
+import type { Course, ImpactCounts, Level, MarkdownImportPreview, Program, Section, Semester, TrashType } from '../../shared/types.ts';
 import { api, errorMessage } from '../lib/api.ts';
-import { plural } from '../lib/format.ts';
+import { mdPreview, plural } from '../lib/format.ts';
 import { invalidateContent, queryClient, useTree } from '../lib/queries.ts';
 import { cn, COURSE_HEX } from '../lib/util.ts';
 import { CourseIcon, ICONS } from './CourseIcon.tsx';
@@ -86,6 +86,11 @@ function ItemDialog({ state, onClose }: { state: { kind: 'create'; level: Level;
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [markdownText, setMarkdownText] = useState('');
+  const [markdownDraft, setMarkdownDraft] = useState('');
+  const [markdownFile, setMarkdownFile] = useState('');
+  const [markdownPreview, setMarkdownPreview] = useState<MarkdownImportPreview | null>(null);
+  const [markdownBusy, setMarkdownBusy] = useState(false);
   const [v, setV] = useState<Record<string, string | number | null>>(() => ({
     title: (editing?.title as string) ?? '',
     description: (editing?.description as string) ?? '',
@@ -102,6 +107,50 @@ function ItemDialog({ state, onClose }: { state: { kind: 'create'; level: Level;
     parentId: state.kind === 'create' ? (state.parentId ?? '') : '',
   }));
   const set = (k: string, val: string | number | null) => setV((p) => ({ ...p, [k]: val }));
+
+  const inspectMarkdown = async (text: string, source: string) => {
+    setError(null);
+    setMarkdownPreview(null);
+    if (!text.trim()) {
+      setError('Paste some Markdown or choose a .md file first.');
+      return;
+    }
+    setMarkdownBusy(true);
+    try {
+      const preview = await api.post<MarkdownImportPreview>('/api/import/markdown/preview', { markdown: text });
+      setMarkdownText(text);
+      setMarkdownFile(source);
+      setMarkdownPreview(preview);
+      if (!String(v.title).trim() && preview.suggestedTitle) set('title', preview.suggestedTitle);
+    } catch (err) {
+      setMarkdownText('');
+      setMarkdownFile('');
+      setError(errorMessage(err));
+    } finally {
+      setMarkdownBusy(false);
+    }
+  };
+
+  const chooseMarkdown = async (file: File) => {
+    setError(null);
+    if (!file.name.toLowerCase().endsWith('.md')) {
+      setError('Choose a Markdown file ending in .md.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('The Markdown file is too large (max 10 MB).');
+      return;
+    }
+    try {
+      const text = await file.text();
+      setMarkdownDraft(text);
+      await inspectMarkdown(text, file.name);
+    } catch (err) {
+      setMarkdownText('');
+      setMarkdownFile('');
+      setError(errorMessage(err));
+    }
+  };
 
   // Parent options for create.
   const parents = useMemo(() => {
@@ -138,8 +187,15 @@ function ItemDialog({ state, onClose }: { state: { kind: 'create'; level: Level;
     setBusy(true);
     try {
       if (state.kind === 'create') {
-        const created = await api.post<AnyItem>(`/api/${level}s`, body);
-        toast.success(`Created ${LEVEL_LABEL[level]} “${created.title}”`);
+        let created: AnyItem;
+        if (level === 'section' && markdownPreview && markdownText) {
+          const result = await api.post<{ section: Section; imported: number }>('/api/import/markdown/create-section', { section: body, markdown: markdownText });
+          created = result.section;
+          toast.success(`Created section “${created.title}” with ${plural(result.imported, 'flashcard')}`);
+        } else {
+          created = await api.post<AnyItem>(`/api/${level}s`, body);
+          toast.success(`Created ${LEVEL_LABEL[level]} “${created.title}”`);
+        }
         invalidateContent();
         onClose();
         if (level === 'course') navigate(`/courses/${created.id}`);
@@ -170,12 +226,12 @@ function ItemDialog({ state, onClose }: { state: { kind: 'create'; level: Level;
       open
       onOpenChange={(o) => !o && onClose()}
       title={title}
-      size={level === 'course' ? 'lg' : 'md'}
+      size={level === 'course' || level === 'section' ? 'lg' : 'md'}
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" form="item-form" loading={busy}>
-            {state.kind === 'create' ? `Create ${LEVEL_LABEL[level]}` : 'Save changes'}
+          <Button variant="primary" type="submit" form="item-form" loading={busy} disabled={markdownBusy || !!markdownPreview?.errors.length}>
+            {busy && markdownPreview ? 'Cooking your flashcards…' : state.kind === 'create' && level === 'section' && markdownPreview ? `Create section & ${markdownPreview.totalCards} flashcards` : state.kind === 'create' ? `Create ${LEVEL_LABEL[level]}` : 'Save changes'}
           </Button>
         </>
       }
@@ -294,6 +350,95 @@ function ItemDialog({ state, onClose }: { state: { kind: 'create'; level: Level;
             <Field label="Notes" optional htmlFor="f-notes">
               <Textarea id="f-notes" value={String(v.notes)} onChange={(e) => set('notes', e.target.value)} rows={3} placeholder="Reading list, slide link reference, what to focus on…" />
             </Field>
+            {state.kind === 'create' && (
+              <div className="rounded-xl border border-border bg-surface-2/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Make flashcards from Markdown</p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      Upload a Markdown <code>.md</code> file and Recall will turn its questions and answers into flashcards for this section.
+                    </p>
+                  </div>
+                  {!markdownPreview ? (
+                    <label className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 text-sm font-medium shadow-soft hover:bg-surface-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--focus)]">
+                      <FileUp className="size-4" aria-hidden />
+                      {markdownBusy ? 'Cooking your flashcards…' : 'Upload .md file'}
+                      <input
+                        type="file"
+                        accept=".md,text/markdown,text/plain"
+                        className="sr-only"
+                        disabled={markdownBusy}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void chooseMarkdown(file);
+                        }}
+                      />
+                    </label>
+                  ) : (
+                    <Button
+                      size="sm"
+                      icon={<X className="size-4" />}
+                      onClick={() => {
+                        setMarkdownText('');
+                        setMarkdownDraft('');
+                        setMarkdownFile('');
+                        setMarkdownPreview(null);
+                      }}
+                    >
+                      Remove file
+                    </Button>
+                  )}
+                </div>
+                {!markdownPreview && (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-3 text-xs text-muted before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+                      or paste Markdown directly
+                    </div>
+                    <Textarea
+                      className="mt-3 font-mono text-sm"
+                      rows={8}
+                      value={markdownDraft}
+                      onChange={(e) => setMarkdownDraft(e.target.value)}
+                      placeholder={'# Lecture 03\n\n## Topic\n\n**Q: What is the question?**\nThe answer goes here.'}
+                      aria-label="Paste Markdown to make flashcards"
+                    />
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-muted">
+                        Use <code>**Q: Your question?**</code>, followed by the answer. <code>## Topic</code> headings become tags.
+                      </p>
+                      <Button size="sm" variant="primary" loading={markdownBusy} disabled={!markdownDraft.trim()} onClick={() => void inspectMarkdown(markdownDraft, 'Pasted Markdown')}>
+                        {markdownBusy ? 'Cooking your flashcards…' : 'Preview flashcards'}
+                      </Button>
+                    </div>
+                    {markdownBusy && <p className="mt-3 text-sm font-medium text-primary-text">Cooking your flashcards…</p>}
+                  </div>
+                )}
+                {markdownPreview && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium">
+                      {markdownFile} · found {plural(markdownPreview.totalCards, 'flashcard')}
+                    </p>
+                    {markdownPreview.errors.map((problem) => (
+                      <Alert key={problem} tone="danger" className="mt-2">
+                        {problem}
+                      </Alert>
+                    ))}
+                    {markdownPreview.cards.length > 0 && (
+                      <ol className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
+                        {markdownPreview.cards.map((card, index) => (
+                          <li key={`${card.line}-${index}`} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                            <p className="font-medium">{card.question}</p>
+                            <p className="mt-1 text-muted">{mdPreview(card.answer, 160)}</p>
+                            {card.topic && <p className="mt-1 text-xs text-primary-text">Tag: {card.topic}</p>}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {markdownPreview.totalCards > markdownPreview.cards.length && <p className="mt-2 text-xs text-muted">Showing the first {markdownPreview.cards.length} cards.</p>}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
