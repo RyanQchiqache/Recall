@@ -1,4 +1,4 @@
-import { Archive, Database, Download, FlaskConical, HardDrive, Info, Package, RotateCcw, Save, ShieldCheck, Upload } from 'lucide-react';
+import { Archive, Database, Download, FlaskConical, FolderOpen, HardDrive, Info, Package, RotateCcw, Save, ShieldCheck, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import type { AppSettings } from '../../shared/settings.ts';
@@ -10,6 +10,7 @@ import { Alert, Badge, ErrorState, PageLoader, Panel, Spinner } from '../compone
 import { Checkbox, Field, Input, Segmented, Select, Switch } from '../components/ui/Form.tsx';
 import { useToast } from '../components/ui/Toast.tsx';
 import { api, downloadUrl, errorMessage } from '../lib/api.ts';
+import { backupFolderArchive } from '../lib/backupFolder.ts';
 import { formatBytes, formatDateTime } from '../lib/format.ts';
 import { invalidateContent, queryClient, useDashboard, useSettings, useSnapshots, useSystem, useTree } from '../lib/queries.ts';
 import { setThemePreference } from '../lib/theme.ts';
@@ -245,6 +246,31 @@ function BackupsCard({ settings }: { settings: AppSettings }) {
       .catch((e) => toast.error(errorMessage(e)))
       .finally(() => setBusy(null));
   };
+  const pickFolder = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    if (!('webkitdirectory' in input)) {
+      toast.error('This browser cannot select folders. Choose a ZIP backup instead.');
+      return;
+    }
+    input.webkitdirectory = true;
+    input.multiple = true;
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? []);
+      if (!files.length) return;
+      setBusy('folder');
+      try {
+        const archive = await backupFolderArchive(files);
+        const data = await api.upload<RestorePreview>('/api/restore/preview', archive, archive.name);
+        setPreview({ data, source: files[0].webkitRelativePath.split('/')[0] });
+      } catch (e) {
+        toast.error(errorMessage(e));
+      } finally {
+        setBusy(null);
+      }
+    };
+    input.click();
+  };
   const saveBackupSettings = async () => {
     try {
       await api.patch('/api/settings', { backup: { ...b, directory: b.directory?.trim() || null } });
@@ -261,16 +287,20 @@ function BackupsCard({ settings }: { settings: AppSettings }) {
   return (
     <Card id="backups" title="Backups & import" icon={<HardDrive />} description="Your data never leaves this computer unless you copy a backup file somewhere yourself.">
       <div className="flex flex-col gap-6">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Button variant="primary" icon={<Download className="size-4" />} onClick={() => downloadUrl('/api/export/full')}>
             Export full backup
           </Button>
-          <Button icon={<Upload className="size-4" />} loading={busy === 'upload'} onClick={() => pickFile(previewFile)}>
-            Restore or import…
+          <Button icon={<Upload className="size-4" />} loading={busy === 'upload'} disabled={busy !== null} onClick={() => pickFile(previewFile)}>
+            Restore or import ZIP…
+          </Button>
+          <Button icon={<FolderOpen className="size-4" />} loading={busy === 'folder'} disabled={busy !== null} onClick={pickFolder}>
+            Restore or import folder…
           </Button>
           <Button
             icon={<Database className="size-4" />}
             loading={busy === 'snap'}
+            disabled={busy !== null}
             onClick={async () => {
               setBusy('snap');
               try {
@@ -289,7 +319,7 @@ function BackupsCard({ settings }: { settings: AppSettings }) {
           </Button>
         </div>
         <p className="text-[13px] text-muted">
-          A full backup (.zip) contains every program, card, image, schedule, review, session and setting. “Restore or import” accepts a full backup (replaces everything after a preview) or a course package exported from a course page (added as a new course).
+          A full backup contains every program, card, image, schedule, review, session and setting. Choose a ZIP file or an extracted backup folder containing manifest.json, data.json and any media. Both options accept full backups (replace everything after a preview) and course packages (add a new course).{' '}
           Copy full backups to a separate drive — snapshots on the same disk do not protect against disk failure.
         </p>
 
@@ -451,7 +481,7 @@ function RestoreDialog({ preview, source, onClose }: { preview: RestorePreview; 
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-success">✓ The file was checked completely (structure, references and images) before anything changes.</p>
+        <p className="text-sm text-success">✓ The backup was checked completely (structure, references and images) before anything changes.</p>
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {rows.map(([label, n]) => (
             <div key={label} className="rounded-xl bg-surface-2 px-3 py-2">
