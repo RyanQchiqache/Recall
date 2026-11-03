@@ -12,6 +12,7 @@ import * as csv from './services/csv.ts';
 import * as demo from './services/demo.ts';
 import * as drafts from './services/drafts.ts';
 import * as h from './services/hierarchy.ts';
+import * as markdownImport from './services/markdown-import.ts';
 import * as notes from './services/notes.ts';
 import * as templates from './services/templates.ts';
 import { MAX_MEDIA_BYTES, saveMedia } from './services/media.ts';
@@ -95,6 +96,11 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     reply.code(201);
     const b = body(req);
     return h.duplicateCourse(ctx, req.params.id, { semesterId: b.semesterId as string, copyProgress: b.copyProgress === true, title: b.title as string | undefined });
+  });
+  post('/api/import/markdown/preview', (req) => markdownImport.previewMarkdown(body(req)));
+  post('/api/import/markdown/create-section', (req, reply) => {
+    reply.code(201);
+    return markdownImport.createSectionFromMarkdown(ctx, body(req));
   });
 
   // ----- Trash -----
