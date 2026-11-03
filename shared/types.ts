@@ -517,3 +517,17 @@ export interface CsvPreview {
   duplicates: number;
   sectionsToCreate: string[];
 }
+
+export interface MarkdownImportCard {
+  question: string;
+  answer: string;
+  topic: string | null;
+  line: number;
+}
+
+export interface MarkdownImportPreview {
+  suggestedTitle: string | null;
+  totalCards: number;
+  cards: MarkdownImportCard[];
+  errors: string[];
+}
