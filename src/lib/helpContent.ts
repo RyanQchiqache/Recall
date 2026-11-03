@@ -103,6 +103,14 @@ export const HELP_ITEMS: HelpItem[] = [
     terms: ['latex katex markdown upload photo diagram'],
   },
   {
+    id: 'markdown-card-import',
+    category: 'cards',
+    question: 'Can I upload a Markdown .md file and turn it into flashcards?',
+    answer: 'Yes. While creating a section, upload a .md file or paste Markdown directly into the text box. Recall finds each **Q: …** question and uses the Markdown below it as the answer, then shows a preview before creating the section and flashcards.',
+    bullets: ['A single # heading suggests the section title.', 'Each ## topic heading becomes a tag.', 'Lists, LaTeX equations and fenced code blocks are kept in the card answers.'],
+    terms: ['markdown md file upload import questions answers flashcards section'],
+  },
+  {
     id: 'drafts',
     category: 'cards',
     question: 'What happens if I leave an unfinished card?',
@@ -284,8 +292,8 @@ export const HELP_ITEMS: HelpItem[] = [
   {
     id: 'restore-safety',
     category: 'data',
-    question: 'What happens when I restore or import a file?',
-    answer: 'Recall first validates the entire file and shows a preview. A full restore replaces all data only after confirmation and creates a pre-restore snapshot. A course package adds a new course. A failed validation or import leaves current data untouched.',
+    question: 'What happens when I restore or import a ZIP file or folder?',
+    answer: 'Choose a ZIP backup or an extracted folder containing manifest.json, data.json and any media. Recall first validates the entire backup and shows a preview. A full restore replaces all data only after confirmation and creates a pre-restore snapshot. A course package adds a new course. A failed validation or import leaves current data untouched.',
     terms: ['replace preview rollback'],
   },
   {
