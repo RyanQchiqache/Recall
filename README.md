@@ -137,7 +137,7 @@ The resolved paths are shown in **Settings → Data location** and printed at st
 All of these are in **Settings → Backups & import**.
 
 - **Export full backup** downloads a versioned `.zip` with `manifest.json`, `data.json` and `media/`. It contains every program, semester, course, section, note, generated card, template, tag, image, schedule, review event, study session (including an open one), settings and unsaved drafts.
-- **Restore or import…** first shows a preview with counts, schema version and warnings. The archive is extracted defensively: no path traversal, size and ratio limits, and images are checked by their real file type. The data is then loaded into an empty scratch database to check every reference *before* your live data is touched.
+- **Restore or import ZIP…** and **Restore or import folder…** accept a ZIP backup or its extracted folder. For folders, select the folder directly containing `manifest.json`, `data.json` and any `media/` files, such as `recall_backup`. Both options first show a preview with counts, schema version and warnings. The archive is extracted defensively: no path traversal, size and ratio limits, and images are checked by their real file type. The data is then loaded into an empty scratch database to check every reference *before* your live data is touched.
   - A **full backup** replaces everything, all-or-nothing, after explicit confirmation. A `pre-restore-…` snapshot of your current data is taken first.
   - A **course package** (exported from a course page with ⋯ → *Export course package*) is added as a **new** course in a semester you choose, with new IDs. Its manifest states what it includes: content, images, and optionally schedules. Review history and settings are not included.
   - Backups from a newer, unsupported format or schema version are rejected safely.
@@ -145,6 +145,22 @@ All of these are in **Settings → Backups & import**.
 - **CSV** (course page ⋯ → *Import cards from CSV* / *Export cards as CSV*). The import maps columns (front, back, section, tags, source, explanation, hint and type) and supports basic, reverse and cloze notes. It handles quoted fields, multi-line text and UTF-8, shows per-row errors in a preview, creates missing sections only after you confirm, and lets you skip duplicates. Image-occlusion and template notes are exported as readable text but need a course package or full backup for a lossless move. CSV protects against spreadsheet formula injection and is a convenience format, **not** a complete backup.
 
 > **Important:** snapshots live on the same disk as your data and do **not** protect against disk failure or loss of the computer. Regularly copy an **exported full backup** to a separate drive or another safe place.
+
+### Create flashcards from a Markdown file
+
+When creating a section, either choose **Upload .md file** or paste Markdown directly into the text box. Recall turns question-and-answer blocks into basic flashcards, shows a preview, and creates the section and cards together only after you confirm. While it processes the content, it shows **Cooking your flashcards…**. The supported format is:
+
+```markdown
+# Lecture 03: Camera Calibration
+
+## Camera parameters
+
+**Q: What are extrinsic camera parameters?**
+- A rotation matrix $R$.
+- A translation vector $\mathbf{t}$.
+```
+
+The first `#` heading suggests the section title. Each `##` heading becomes a topic tag for the cards below it. Every `**Q: …**` line starts a card; all Markdown until the next question or topic heading becomes its answer. Lists, equations, and fenced code blocks are preserved.
 
 ---
 
